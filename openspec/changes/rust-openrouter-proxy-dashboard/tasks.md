@@ -1,44 +1,44 @@
 ## 1. Foundation
 
-- [ ] 1.1 Initialize Rust workspace structure for proxy, dashboard API, and shared core.
-- [ ] 1.2 Define canonical request/response schema and error taxonomy.
-- [ ] 1.3 Set up SQLite via sqlx with migration baseline.
-- [ ] 1.4 Implement Claude full-interface protocol adapters (stable + beta) and contract tests.
-- [ ] 1.5 Implement OpenAI full-interface protocol adapters (chat/responses/images/audio/realtime) and contract tests.
+- [x] 1.1 Initialize Rust workspace structure for proxy, dashboard API, and shared core.
+- [x] 1.2 Define canonical request/response schema and error taxonomy.
+- [x] 1.3 Set up SQLite via sqlx with migration baseline.
+- [x] 1.4 Implement Claude full-interface protocol adapters (stable + beta) and contract tests.
+- [x] 1.5 Implement OpenAI full-interface protocol adapters (chat/responses/images/audio/realtime) and contract tests.
 
 ## 2. Provider and Routing
 
-- [ ] 2.1 Create provider adapter trait and base execution context.
-- [ ] 2.2 Implement OpenAI adapter (chat/responses/images/audio/realtime).
-- [ ] 2.3 Implement Anthropic adapter (full API including beta headers).
-- [ ] 2.4 Implement Copilot adapter (Azure OpenAI endpoint).
-- [ ] 2.5 Implement Xiaomi adapter (Mi AI API).
-- [ ] 2.6 Implement Google adapter (Gemini API).
-- [ ] 2.7 Implement OpenRouter adapter.
-- [ ] 2.8 Implement DeepSeek official adapter.
-- [ ] 2.9 Implement logical model alias registry.
-- [ ] 2.10 Implement fixed-priority failover engine and retry budget.
-- [ ] 2.11 Implement failover trigger mapping for balance, 429, 5xx, timeout, model offline, and manual disable.
-- [ ] 2.12 Implement switchable route objective policies (reliability/latency/cost).
+- [x] 2.1 Create provider adapter trait and base execution context.
+- [x] 2.2 Implement OpenAI adapter (chat/responses/images/audio/realtime).
+- [x] 2.3 Implement Anthropic adapter (full API including beta headers).
+- [x] 2.4 Implement Copilot adapter (Azure OpenAI endpoint).
+- [x] 2.5 Implement Xiaomi adapter (Mi AI API).
+- [x] 2.6 Implement Google adapter (Gemini API).
+- [x] 2.7 Implement OpenRouter adapter.
+- [x] 2.8 Implement DeepSeek official adapter.
+- [x] 2.9 Implement logical model alias registry.
+- [x] 2.10 Implement fixed-priority failover engine and retry budget.
+- [x] 2.11 Implement failover trigger mapping for balance, 429, 5xx, timeout, model offline, and manual disable.
+- [x] 2.12 Implement switchable route objective policies (reliability/latency/cost).
 
 ## 3. Multimodal Image Parsing
 
-- [ ] 3.1 Add image input normalization in canonical schema.
-- [ ] 3.2 Implement default same-model multimodal execution when model supports vision.
-- [ ] 3.3 Implement split fallback pipeline: vision parser model + generation model.
+- [x] 3.1 Add image input normalization in canonical schema.
+- [x] 3.2 Implement default same-model multimodal execution when model supports vision.
+- [x] 3.3 Implement split fallback pipeline: vision parser model + generation model.
 - [ ] 3.4 Add dashboard fields for vision/generation model mapping.
-- [ ] 3.5 Add per-model outbound proxy configuration and runtime binding.
+- [x] 3.5 Add per-model outbound proxy configuration and runtime binding.
 
 ## 4. Dashboard and Control Plane
 
-- [ ] 4.1 Implement tenant admin JWT authentication (no SSO).
-- [ ] 4.2 Implement dashboard backend APIs for tenant-scoped providers/models/policies.
-- [ ] 4.3 Implement provider enable/disable force switch.
-- [ ] 4.4 Implement model allow-list configuration per provider.
-- [ ] 4.5 Implement alias mapping and migration policy editor.
-- [ ] 4.6 Implement route strategy switch configuration.
-- [ ] 4.7 Implement API key pool mapping to upstream independent key pools.
-- [ ] 4.8 Implement status views for health, failover events, and tenant-scoped stats.
+- [x] 4.1 Implement tenant admin JWT authentication (no SSO).
+- [x] 4.2 Implement dashboard backend APIs for tenant-scoped providers/models/policies.
+- [x] 4.3 Implement provider enable/disable force switch.
+- [x] 4.4 Implement model allow-list configuration per provider.
+- [x] 4.5 Implement alias mapping and migration policy editor.
+- [x] 4.6 Implement route strategy switch configuration.
+- [x] 4.7 Implement API key pool mapping to upstream independent key pools.
+- [x] 4.8 Implement status views for health, failover events, and tenant-scoped stats.
 
 ## 5. Observability and Safety
 
