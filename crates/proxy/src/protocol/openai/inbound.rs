@@ -182,3 +182,60 @@ fn convert_content_part(part: OpenAiContentPart, has_image: &mut bool) -> Conten
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::openai::types::{
+        OpenAiChatRequest, OpenAiImageUrl, OpenAiMessage, OpenAiMessageContent,
+        OpenAiContentPart,
+    };
+
+    #[test]
+    fn openai_inbound_data_url_image_to_base64() {
+        let req = OpenAiChatRequest {
+            model: "gpt-4o-mini".to_string(),
+            messages: vec![OpenAiMessage {
+                role: "user".to_string(),
+                content: Some(OpenAiMessageContent::Parts(vec![
+                    OpenAiContentPart::ImageUrl {
+                        image_url: OpenAiImageUrl {
+                            url: "data:image/png;base64,Zm9vYmFy".to_string(),
+                            detail: None,
+                        },
+                    },
+                ])),
+                name: None,
+                tool_calls: vec![],
+                tool_call_id: None,
+                refusal: None,
+            }],
+            max_tokens: Some(64),
+            max_completion_tokens: None,
+            temperature: None,
+            top_p: None,
+            n: None,
+            stream: Some(false),
+            stream_options: None,
+            stop: None,
+            tools: vec![],
+            tool_choice: None,
+            parallel_tool_calls: None,
+            response_format: None,
+            seed: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            logprobs: None,
+            top_logprobs: None,
+            user: None,
+            reasoning_effort: None,
+        };
+
+        let out = openai_chat_to_canonical(req, uuid::Uuid::new_v4(), uuid::Uuid::new_v4())
+            .expect("convert");
+
+        assert!(out.has_image);
+        assert!(matches!(out.origin_protocol, llm_core::schema::OriginProtocol::OpenAiChat));
+        assert!(matches!(out.messages[0].content[0], ContentPart::Image { .. }));
+    }
+}

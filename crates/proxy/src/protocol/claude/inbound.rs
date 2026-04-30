@@ -162,3 +162,45 @@ fn convert_block(block: ClaudeContentBlock, has_image: &mut bool) -> Option<Cont
         ClaudeContentBlock::RedactedThinking { .. } => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::claude::types::{ClaudeMessage, ClaudeMessageContent};
+
+    #[test]
+    fn claude_inbound_marks_image_and_origin_protocol() {
+        let req = ClaudeRequest {
+            model: "claude-sonnet-4".to_string(),
+            messages: vec![ClaudeMessage {
+                role: ClaudeRole::User,
+                content: ClaudeMessageContent::Blocks(vec![
+                    ClaudeContentBlock::Text { text: "look".to_string() },
+                    ClaudeContentBlock::Image {
+                        source: ClaudeImageSource::Url {
+                            url: "https://example.com/a.png".to_string(),
+                        },
+                    },
+                ]),
+            }],
+            max_tokens: 128,
+            system: None,
+            temperature: None,
+            top_p: None,
+            top_k: None,
+            stop_sequences: vec![],
+            stream: Some(false),
+            tools: vec![],
+            tool_choice: None,
+            thinking: None,
+            metadata: None,
+        };
+
+        let out = claude_to_canonical(req, uuid::Uuid::new_v4(), uuid::Uuid::new_v4())
+            .expect("convert");
+
+        assert!(out.has_image);
+        assert!(matches!(out.origin_protocol, llm_core::schema::OriginProtocol::Claude));
+        assert_eq!(out.messages.len(), 1);
+    }
+}

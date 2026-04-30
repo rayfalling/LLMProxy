@@ -170,3 +170,34 @@ impl FailoverEngine {
             || alias.failover_triggers.is_empty()  // 默认所有触发器都 failover
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::routing::registry::{AliasTarget, ModelAlias, RouteStrategy};
+
+    #[test]
+    fn failover_trigger_mapping_matches_rule() {
+        let engine = FailoverEngine::new(HashMap::new(), HashMap::new(), HashMap::new(), HashMap::new());
+        let alias = ModelAlias {
+            alias_name: "gpt-4o".to_string(),
+            route_strategy: RouteStrategy::Priority,
+            targets: vec![AliasTarget {
+                provider_id: "openai".to_string(),
+                provider_model: "gpt-4o".to_string(),
+                priority: 0,
+                enabled: true,
+            }],
+            failover_triggers: vec!["rate_limited".to_string()],
+        };
+
+        let err = ProxyError::UpstreamError {
+            provider: "openai".to_string(),
+            status: 429,
+            body: "rate limited".to_string(),
+            trigger: Some(FailoverTrigger::RateLimited),
+        };
+
+        assert!(engine.should_failover(&err, &alias));
+    }
+}
