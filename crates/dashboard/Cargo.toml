@@ -22,10 +22,13 @@ chrono.workspace = true
 uuid.workspace = true
 jsonwebtoken.workspace = true
 argon2.workspace = true
+rand_core.workspace = true
 bytes.workspace = true
 futures.workspace = true
 async-trait.workspace = true
 config.workspace = true
 toml.workspace = true
 url.workspace = true
+include_dir = "0.7"
+mime_guess = "2"
 

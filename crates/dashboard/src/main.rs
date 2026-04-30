@@ -1,6 +1,8 @@
 use dashboard::auth;
+use dashboard::bootstrap;
 use dashboard::handlers;
 use dashboard::state;
+use dashboard::static_assets;
 
 use axum::{routing::{get, post, put}, Router};
 use llm_core::{config::AuthConfig, db::connect_and_migrate};
@@ -42,6 +44,8 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/healthz", get(healthz))
+        .route("/api/setup", post(bootstrap::setup))
+        .route("/api/setup/status", get(bootstrap::setup_status))
         .route("/api/auth/login", post(auth::login))
         .route("/api/me", get(handlers::me))
         .route("/api/providers", get(handlers::list_providers))
@@ -72,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/api/events/failovers", get(handlers::list_failover_events))
         .route("/api/stats", get(handlers::tenant_stats))
+        .fallback(static_assets::serve_spa)
         .with_state(state);
 
     let addr: SocketAddr = format!("{host}:{port}").parse()?;

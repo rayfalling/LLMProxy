@@ -20,3 +20,21 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 *.swp
+
+# Frontend (web/)
+web/node_modules/
+web/dist/
+web/.env.local
+web/playwright-report/
+web/test-results/
+web/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OpenSpec local artifacts
+openspec/.cache/
+
+# Misc
+*.log

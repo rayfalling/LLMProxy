@@ -1,0 +1,66 @@
+## 1. Backend — Setup Endpoint
+
+- [x] 1.1 Add `crates/dashboard/src/bootstrap.rs` with `is_initialized(pool)` helper.
+- [x] 1.2 Implement `POST /api/setup` handler (validation + Argon2 + transactional insert).
+- [x] 1.3 Implement `GET /api/setup/status` returning `{"initialized": bool}`.
+- [x] 1.4 Wire both routes into `dashboard::router()` (no JWT required).
+- [x] 1.5 Unit tests: empty DB success, 409 when already initialized, password mismatch, password too short.
+- [x] 1.6 Update `dashboard::tests::integration` to cover setup → login round trip.
+
+## 2. Backend — Static Asset Serving
+
+- [x] 2.1 Add `include_dir`, `mime_guess` to `crates/dashboard/Cargo.toml`.
+- [x] 2.2 Create `crates/dashboard/build.rs` that ensures `web/dist/index.html` placeholder exists.
+- [x] 2.3 Add `crates/dashboard/src/static_assets.rs` with `WEB_DIST` `Dir`.
+- [x] 2.4 Add SPA fallback service: `/api/*` → API router, everything else → embedded asset or `index.html`.
+- [x] 2.5 Integration test: GET `/` returns HTML; GET `/dashboard` returns same `index.html`; GET `/assets/foo.js` (when present) returns JS with correct mime.
+
+## 3. Frontend — Project Scaffold (`web/`)
+
+- [x] 3.1 Verify `web/package.json`, `vite.config.ts`, `tsconfig.json`, Tailwind/PostCSS configs (already created in prior step; reconcile after move).
+- [ ] 3.2 Add `web/playwright.config.ts` and `web/tests/` directory.
+- [x] 3.3 Add npm scripts: `dev`, `build`, `preview`, `test:unit`, `test:e2e`.
+- [x] 3.4 Add `web/.gitignore` for `node_modules`, `dist`, `playwright-report`, `test-results`.
+- [x] 3.5 Verify `npm install && npm run build` produces `web/dist/index.html` + assets locally.
+
+## 4. Frontend — Setup & Auth Flow
+
+- [x] 4.1 `src/api/client.ts` — Axios instance with JWT interceptor and 401 handling.
+- [x] 4.2 `src/api/types.ts` — TS interfaces for setup, auth, providers, aliases, stats.
+- [x] 4.3 `src/pages/Setup.tsx` — form, validation, success redirect.
+- [x] 4.4 `src/pages/Login.tsx` — form, error display, JWT persistence.
+- [x] 4.5 `src/components/ProtectedRoute.tsx` + `App.tsx` route table with setup-status guard.
+- [ ] 4.6 Vitest cases for Setup validation + Axios interceptors.
+
+## 5. Frontend — Dashboard CRUD Pages
+
+- [ ] 5.1 `Dashboard.tsx` — tenant stats cards + last 10 failover events.
+- [ ] 5.2 `ProviderMgmt.tsx` — list providers, toggle enabled, expand to model rows with per-model toggle.
+- [ ] 5.3 `AliasMgmt.tsx` — list aliases, edit `route_strategy`, reorder/toggle targets.
+- [ ] 5.4 `KeyPoolMgmt.tsx` — list downstream API keys + their provider key associations, add/remove.
+- [ ] 5.5 `VisionMgmt.tsx` — list model→vision_parser/generation_alias mappings, edit modal.
+- [ ] 5.6 `Header.tsx` + sidebar nav linking the five pages.
+
+## 6. End-to-End Tests (Playwright)
+
+- [ ] 6.1 `tests/setup.spec.ts` — fresh DB → setup wizard → success → land on `/`.
+- [ ] 6.2 `tests/login.spec.ts` — login with seeded admin → land on `/dashboard`.
+- [ ] 6.3 `tests/providers.spec.ts` — toggle provider enabled and verify persistence after reload.
+- [ ] 6.4 `tests/aliases.spec.ts` — change strategy, reorder targets, verify persistence.
+- [ ] 6.5 `tests/setup-locked.spec.ts` — `/setup` redirects to `/` once initialized.
+- [ ] 6.6 CI script `scripts/e2e.ps1` (Windows) and `scripts/e2e.sh` (Linux) that builds, launches dashboard with temp SQLite, runs Playwright, tears down.
+
+## 7. Documentation & Deployment
+
+- [ ] 7.1 Update root `README.md`: dev workflow (Rust + npm), production build (`npm run build` then `cargo build`), first-boot setup screenshots/steps.
+- [ ] 7.2 Update `RUNBOOK.md`: incident steps for "DB wiped" and "setup endpoint inaccessible".
+- [ ] 7.3 Add `scripts/seed.sql` for optional demo data (tenant, provider, models, alias).
+- [ ] 7.4 Update systemd unit notes in `deploy/` to call out `/setup` first-visit step.
+- [ ] 7.5 Verify on `192.168.50.64`: deploy fresh build, complete setup via browser, run a sample chat completion through proxy with the new tenant's API key.
+
+## 8. Release
+
+- [ ] 8.1 All Rust unit/integration tests green (`cargo test --workspace`).
+- [ ] 8.2 All Vitest + Playwright tests green.
+- [ ] 8.3 Single `cargo build --release -p dashboard` produces a binary that serves the SPA correctly when run alone.
+- [ ] 8.4 Update OpenSpec change status; archive after operator validation on bare metal.
