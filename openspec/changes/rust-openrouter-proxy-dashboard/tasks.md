@@ -51,16 +51,16 @@
 
 ## 6. Validation
 
-- [ ] 6.1 Contract tests for Claude full-interface compatibility.
-- [ ] 6.2 Contract tests for OpenAI full-interface compatibility.
-- [ ] 6.3 End-to-end tests for default same-model multimodal and split fallback modes.
-- [ ] 6.4 End-to-end tests for provider outage and fixed-priority automatic migration.
-- [ ] 6.5 End-to-end tests for model-level outbound proxy routing.
-- [ ] 6.6 Dashboard integration tests for tenant/provider/model/route controls.
+- [x] 6.1 Contract tests for Claude full-interface compatibility.
+- [x] 6.2 Contract tests for OpenAI full-interface compatibility.
+- [x] 6.3 End-to-end tests for default same-model multimodal and split fallback modes.
+- [x] 6.4 End-to-end tests for provider outage and fixed-priority automatic migration.
+- [x] 6.5 End-to-end tests for model-level outbound proxy routing.
+- [x] 6.6 Dashboard integration tests for tenant/provider/model/route controls.
 
 ## 7. Release Readiness
 
-- [ ] 7.1 Produce deployment profile: single binary first.
-- [ ] 7.2 Add environment and config documentation.
-- [ ] 7.3 Add runbook for failover incident operations and proxy-region issues.
-- [ ] 7.4 Mark change ready after open questions are resolved.
+- [x] 7.1 Produce deployment profile: single binary first.
+- [x] 7.2 Add environment and config documentation.
+- [x] 7.3 Add runbook for failover incident operations and proxy-region issues.
+- [x] 7.4 Mark change ready after open questions are resolved.
