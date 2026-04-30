@@ -1,10 +1,16 @@
 # Docker Compose — run proxy + dashboard together
+#
+# Usage:
+#   cp .env.example .env        # fill in JWT_SECRET (and optional API keys)
+#   docker compose up -d --build
+#
+# Both services share one SQLite volume at /data/llmproxy.db.
+# The dashboard container waits for the proxy to pass its healthcheck before starting.
 
 services:
   proxy:
     build:
       context: .
-      target: builder
     image: llmproxy:latest
     command: /app/proxy
     ports:
@@ -13,9 +19,15 @@ services:
       DATABASE_URL: sqlite:///data/llmproxy.db
       PROXY_HOST: "0.0.0.0"
       PROXY_PORT: "8080"
-      RUST_LOG: proxy=info,tower_http=info
+      RUST_LOG: "${RUST_LOG:-proxy=info,tower_http=info}"
     volumes:
       - llmproxy_data:/data
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fs http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
 
   dashboard:
@@ -27,14 +39,22 @@ services:
       DATABASE_URL: sqlite:///data/llmproxy.db
       DASHBOARD_HOST: "0.0.0.0"
       DASHBOARD_PORT: "8081"
-      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env}"
       JWT_EXPIRY_SECS: "${JWT_EXPIRY_SECS:-86400}"
-      RUST_LOG: dashboard=info,tower_http=info
+      RUST_LOG: "${RUST_LOG:-dashboard=info,tower_http=info}"
     volumes:
       - llmproxy_data:/data
     depends_on:
-      - proxy
+      proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fs http://127.0.0.1:8081/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
 
 volumes:
   llmproxy_data:
+    driver: local

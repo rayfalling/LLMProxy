@@ -15,7 +15,7 @@ RUN cargo build --release --bin proxy --bin dashboard
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libsqlite3-0 ca-certificates \
+    libsqlite3-0 ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -r -s /bin/false llmproxy
