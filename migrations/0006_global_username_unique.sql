@@ -13,9 +13,9 @@
 --      login API.
 --
 -- SQLite cannot ALTER an existing UNIQUE constraint in place, so we use
--- the standard table-rebuild recipe inside a single transaction.
-
-BEGIN TRANSACTION;
+-- the standard table-rebuild recipe. sqlx wraps every migration in its
+-- own transaction, so an explicit BEGIN/COMMIT here would error with
+-- "cannot start a transaction within a transaction".
 
 CREATE TABLE tenant_admins_new (
     id TEXT PRIMARY KEY,
@@ -38,5 +38,3 @@ ALTER TABLE tenant_admins_new RENAME TO tenant_admins;
 CREATE INDEX IF NOT EXISTS idx_tenant_admins_tenant ON tenant_admins(tenant_id);
 -- The UNIQUE(username) constraint provides an implicit index, so an
 -- explicit `idx_tenant_admins_username` is no longer needed.
-
-COMMIT;
