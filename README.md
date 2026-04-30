@@ -100,14 +100,33 @@ single SQL transaction that creates both the `tenants` row and the
 409 (`already_initialized`); the SPA also auto-redirects already-set-up
 browsers back to `/`.
 
+**Login is tenantless.** After setup, the login form asks for username +
+password only — admin usernames are globally unique (enforced by
+migration `0006_global_username_unique`) and the dashboard resolves the
+admin's tenant automatically. New tenants are still onboarded by
+running the setup wizard against a fresh DB; user-managed multi-tenant
+signup is not exposed by the WebUI.
+
 > The setup endpoint is the **only** unauthenticated mutation in the
 > control-plane API. Every other `PUT/POST` requires
 > `Authorization: Bearer <JWT>` from `POST /api/auth/login`.
 
-After setup completes you can either keep using the WebUI for everything
-or pop the demo seed (`scripts/seed.sql`) into the same SQLite file to
-get a working OpenAI alias for `curl` smoke-tests — see
-[Seeding](#seeding-demo-data) below.
+After setup completes, **drive everything through the WebUI**:
+
+1. **Providers** → *+ Add provider* (name, base URL, auth mode).
+2. Expand each provider → *+ Add key* (paste the upstream API key) and
+   *+ Add model* (e.g. `gpt-4o-2024-11-20`).
+3. **Aliases** → *+ Add alias* (the model name your clients will
+   request).
+4. **API Keys** → *+ Issue new key*. The plaintext token is shown
+   **once** in a reveal modal — copy it immediately.
+5. **Key Pools** *(optional)* → pin a tenant API key to a subset of
+   provider keys for a given provider.
+6. **Vision** *(optional)* → register vision-parser → generation
+   alias mappings.
+
+The legacy `scripts/seed.sql` demo path is still available
+(see [Seeding](#seeding-demo-data)) but is no longer required.
 
 ---
 
@@ -145,25 +164,27 @@ SQLite is opened with:
 - `PRAGMA foreign_keys = ON` — referential integrity
 - Pool max 16 connections
 
-### Schema (5 migrations)
+### Schema (6 migrations)
 
-| Migration | Tables added |
+| Migration | Tables / changes |
 |---|---|
 | 0001_initial | tenants, api_keys, providers, provider_keys, provider_models, outbound_proxies, model_aliases, model_alias_targets, failover_rules, request_logs |
 | 0002_tenant_admins | tenant_admins |
 | 0003_api_key_provider_key_pools | api_key_provider_key_pools |
 | 0004_security_observability | api_key_model_acl, tenant_metrics_hourly |
 | 0005_model_vision_mappings | model_vision_mappings |
+| 0006_global_username_unique | drops `UNIQUE(tenant_id, username)`, adds global `UNIQUE(username)` on `tenant_admins` to enable tenantless login |
 
 ---
 
 ## Seeding Demo Data
 
 Production deployments should drive everything through the WebUI
-(`/providers`, `/aliases`, `/keys`, `/vision` pages) — but for a quick
-`curl` smoke-test, [`scripts/seed.sql`](scripts/seed.sql) inserts a
-demo OpenAI provider, two models, an alias, a downstream API key
-(`llmproxy-demo-key-replace-me`), and the required key-pool binding.
+(`/providers`, `/aliases`, `/api-keys`, `/keys`, `/vision` pages) — but
+for a quick `curl` smoke-test, [`scripts/seed.sql`](scripts/seed.sql)
+inserts a demo OpenAI provider, two models, an alias, a downstream API
+key (`llmproxy-demo-key-replace-me`), and the required key-pool
+binding.
 
 ```bash
 # 1. Complete /setup in the WebUI to create the tenant + admin.

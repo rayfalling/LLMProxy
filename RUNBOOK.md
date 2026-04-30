@@ -19,18 +19,29 @@
    workstation. The SetupGuard will redirect to `/setup` automatically.
 3. **Fill the wizard** — tenant name, admin username, password (≥ 8 chars).
    Submit. The dashboard creates the tenant and Argon2id-hashed admin in
-   one transaction.
-4. **(Optional) Apply demo seed** for an immediate `curl` smoke-test:
+   one transaction. The tenant name is captured **only at signup**; the
+   subsequent login form asks for username + password only — the username
+   is globally unique and resolves to its tenant automatically.
+4. **Add resources via the WebUI**, in this order:
+   1. **Providers** → *+ Add provider* (name, base URL, auth mode).
+   2. Expand each provider → *+ Add key* (paste the upstream API key)
+      and *+ Add model* (e.g. `gpt-4o-2024-11-20`).
+   3. **Aliases** → *+ Add alias* (the name your clients will request,
+      e.g. `gpt-4o`); attach targets via
+      `PUT /api/aliases/<alias>/targets` until the targets editor lands.
+   4. **API Keys** → *+ Issue new key*. The plaintext token is shown
+      **once** in a reveal modal — copy it into your client config
+      immediately; the dashboard only stores the prefix afterwards.
+   5. **Key Pools** *(optional)* → pin a tenant API key to a subset of
+      provider keys for a given provider.
+   6. **Vision** *(optional)* → register OCR-style vision→generation
+      mappings.
+5. **Smoke-test** with `curl`:
    ```bash
-   TENANT_ID=$(sqlite3 /var/lib/llmproxy/llmproxy.db \
-                 "SELECT id FROM tenants LIMIT 1;")
-   sqlite3 /var/lib/llmproxy/llmproxy.db \
-     ".param set :tenant_id '$TENANT_ID'" \
-     ".read /opt/llmproxy/scripts/seed.sql"
+   curl -H "Authorization: Bearer lp_<your-key>" \
+        http://<host>:8080/v1/chat/completions \
+        -d '{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}'
    ```
-5. **Re-create your providers / aliases / key-pools** in the WebUI
-   (Providers → Aliases → Key Pools → Vision tabs), or by replaying a
-   backup of the SQLite file if you keep one.
 
 ### "Setup endpoint inaccessible"
 
