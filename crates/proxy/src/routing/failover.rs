@@ -27,6 +27,8 @@ pub struct FailoverEngine {
     providers: HashMap<String, DynProvider>,
     /// provider_id -> 可用 key 列表（轮询或单 key）
     keys: HashMap<String, Vec<ProviderKeyInfo>>,
+    /// (provider_id, provider_model) -> outbound proxy url
+    model_outbound_proxy: HashMap<(String, String), Option<String>>,
     /// 禁用的 provider_id 集合（手动 disable）
     disabled: std::sync::RwLock<std::collections::HashSet<String>>,
 }
@@ -35,10 +37,12 @@ impl FailoverEngine {
     pub fn new(
         providers: HashMap<String, DynProvider>,
         keys: HashMap<String, Vec<ProviderKeyInfo>>,
+        model_outbound_proxy: HashMap<(String, String), Option<String>>,
     ) -> Self {
         Self {
             providers,
             keys,
+            model_outbound_proxy,
             disabled: std::sync::RwLock::new(Default::default()),
         }
     }
@@ -84,9 +88,15 @@ impl FailoverEngine {
             let mut req = req.clone();
             req.model = target.provider_model.clone();
 
+            let outbound_proxy = self
+                .model_outbound_proxy
+                .get(&(target.provider_id.clone(), target.provider_model.clone()))
+                .cloned()
+                .unwrap_or_else(|| key_info.outbound_proxy.clone());
+
             let ctx = ExecContext {
                 api_key: key_info.api_key.clone(),
-                outbound_proxy: key_info.outbound_proxy.clone(),
+                outbound_proxy,
                 base_url: key_info.base_url.clone(),
                 extra_headers: key_info.extra_headers.clone(),
             };
