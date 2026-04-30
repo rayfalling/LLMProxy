@@ -1,0 +1,22 @@
+# Rust
+target/
+Cargo.lock
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
