@@ -56,11 +56,11 @@
 - [x] 7.2 Update `RUNBOOK.md`: incident steps for "DB wiped" and "setup endpoint inaccessible".
 - [x] 7.3 Add `scripts/seed.sql` for optional demo data (provider, models, alias, demo api_key + key-pool binding) plus `scripts/hash-key.{ps1,sh}` helpers. Tenant/admin creation deliberately delegated to the WebUI `/setup` wizard.
 - [x] 7.4 No `deploy/` directory in this repo; systemd guidance lives inline in `RUNBOOK.md` §0 ("Database Wiped / Fresh Host") and `README.md` §First-Boot Setup, both calling out the `/setup` first-visit step.
-- [ ] 7.5 Bare-metal validation on `192.168.50.64` — DEFERRED to operator. Steps: deploy fresh build, browse to `:8081/setup`, complete wizard, optionally apply `scripts/seed.sql`, run a chat completion through the proxy with the demo API key.
+- [x] 7.5 Bare-metal validation on `192.168.50.64` (Ubuntu 24.04 LXC, root@LLMProxy) — completed 2026-04-30. Deployed `2ea0ca7` via `git pull` + `npm ci && npm run build` + `cargo build --release`. Replaced `/opt/llmproxy/bin/{proxy,dashboard}` (with backups), `systemctl restart` both services. Empty DB → `POST /api/setup` created tenant `acme` + admin → `/api/setup/status` returns `initialized:true` → `POST /api/setup` again returns 409 → `POST /api/auth/login` issues 281-byte JWT → `/api/me /providers /aliases /key-pools /vision-mappings /events/failovers` all 200 → SPA fallback `/providers` serves `index.html` → proxy `:8080/healthz` ok. `GET /api/stats` returned 500 (pre-existing decode bug, unrelated to this change — file follow-up). Chat completion smoke deferred (no real upstream credentials).
 
 ## 8. Release
 
 - [x] 8.1 All Rust unit/integration tests green (`cargo test --workspace`).
 - [x] 8.2 All Vitest + Playwright tests green.
 - [x] 8.3 Single `cargo build --release -p dashboard` produces a binary that serves the SPA correctly when run alone. Verified: fresh DB, `/` + `/setup` deep-link both return embedded `index.html` (484 B), `/assets/index-*.js` returns 228 KB with `text/javascript`, `GET /api/setup/status` returns `{initialized:false}`.
-- [ ] 8.4 Update OpenSpec change status; archive after operator validation on bare metal.
+- [x] 8.4 Update OpenSpec change status; archive after operator validation on bare metal.
