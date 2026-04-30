@@ -5,7 +5,7 @@ use llm_core::{
     provider::{DynProvider, ExecContext},
     schema::{CanonicalRequest, CanonicalResponse},
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::registry::{AliasTarget, ModelAlias, RouteStrategy};
@@ -13,6 +13,7 @@ use super::registry::{AliasTarget, ModelAlias, RouteStrategy};
 /// 每个 provider_key 在数据库中的运行时信息
 #[derive(Debug, Clone)]
 pub struct ProviderKeyInfo {
+    pub provider_key_id: String,
     pub api_key: String,
     pub outbound_proxy: Option<String>,
     pub base_url: String,
@@ -27,6 +28,8 @@ pub struct FailoverEngine {
     providers: HashMap<String, DynProvider>,
     /// provider_id -> 可用 key 列表（轮询或单 key）
     keys: HashMap<String, Vec<ProviderKeyInfo>>,
+    /// downstream api_key_id -> allowed provider_key_ids
+    key_pool_mapping: HashMap<String, HashSet<String>>,
     /// (provider_id, provider_model) -> outbound proxy url
     model_outbound_proxy: HashMap<(String, String), Option<String>>,
     /// 禁用的 provider_id 集合（手动 disable）
@@ -37,11 +40,13 @@ impl FailoverEngine {
     pub fn new(
         providers: HashMap<String, DynProvider>,
         keys: HashMap<String, Vec<ProviderKeyInfo>>,
+        key_pool_mapping: HashMap<String, HashSet<String>>,
         model_outbound_proxy: HashMap<(String, String), Option<String>>,
     ) -> Self {
         Self {
             providers,
             keys,
+            key_pool_mapping,
             model_outbound_proxy,
             disabled: std::sync::RwLock::new(Default::default()),
         }
@@ -81,7 +86,7 @@ impl FailoverEngine {
                 continue;
             };
 
-            let Some(key_info) = self.pick_key(&target.provider_id) else {
+            let Some(key_info) = self.pick_key(req.api_key_id.to_string().as_str(), &target.provider_id) else {
                 continue;
             };
 
@@ -131,8 +136,15 @@ impl FailoverEngine {
         targets
     }
 
-    fn pick_key(&self, provider_id: &str) -> Option<&ProviderKeyInfo> {
-        self.keys.get(provider_id)?.first()
+    fn pick_key(&self, downstream_api_key_id: &str, provider_id: &str) -> Option<&ProviderKeyInfo> {
+        let keys = self.keys.get(provider_id)?;
+
+        match self.key_pool_mapping.get(downstream_api_key_id) {
+            Some(allowed) if !allowed.is_empty() => keys
+                .iter()
+                .find(|k| allowed.contains(&k.provider_key_id)),
+            _ => keys.first(),
+        }
     }
 
     fn should_failover(&self, err: &ProxyError, alias: &ModelAlias) -> bool {

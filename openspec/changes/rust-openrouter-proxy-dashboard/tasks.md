@@ -42,12 +42,12 @@
 
 ## 5. Observability and Safety
 
-- [ ] 5.1 Add structured request logs with sensitive field redaction.
-- [ ] 5.2 Add tenant-scoped metrics: QPS, p50/p95 latency, error rate, failover count.
-- [ ] 5.3 Add API key mapping and request-level tenant authorization checks.
-- [ ] 5.4 Add quota and rate limiting per downstream key.
-- [ ] 5.5 Add model-level access control policy per key.
-- [ ] 5.6 Add relational DB persistence for config and statistics.
+- [x] 5.1 Add structured request logs with sensitive field redaction.
+- [x] 5.2 Add tenant-scoped metrics: QPS, p50/p95 latency, error rate, failover count.
+- [x] 5.3 Add API key mapping and request-level tenant authorization checks.
+- [x] 5.4 Add quota and rate limiting per downstream key.
+- [x] 5.5 Add model-level access control policy per key.
+- [x] 5.6 Add relational DB persistence for config and statistics.
 
 ## 6. Validation
 

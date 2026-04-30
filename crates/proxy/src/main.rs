@@ -12,7 +12,7 @@ mod state;
 
 use axum::{routing::{get, post}, Router};
 use llm_core::db::connect_and_migrate;
-use std::{collections::HashMap, env, net::SocketAddr, sync::Arc};
+use std::{collections::{HashMap, HashSet}, env, net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -50,9 +50,15 @@ async fn main() -> anyhow::Result<()> {
     let alias_registry = Arc::new(AliasRegistry::new(pool.clone()));
     alias_registry.reload().await?;
 
-    let (providers_map, keys_map, model_proxy_map, vision_config) = load_runtime_from_db(&pool).await?;
+    let (providers_map, keys_map, key_pool_mapping, model_proxy_map, vision_config) =
+        load_runtime_from_db(&pool).await?;
 
-    let failover = Arc::new(FailoverEngine::new(providers_map, keys_map, model_proxy_map));
+    let failover = Arc::new(FailoverEngine::new(
+        providers_map,
+        keys_map,
+        key_pool_mapping,
+        model_proxy_map,
+    ));
     let multimodal = Arc::new(MultimodalRouter::new(failover, alias_registry, vision_config));
 
     let state = AppState { pool, multimodal };
@@ -75,6 +81,7 @@ async fn load_runtime_from_db(
 ) -> anyhow::Result<(
     HashMap<String, llm_core::provider::DynProvider>,
     HashMap<String, Vec<ProviderKeyInfo>>,
+    HashMap<String, HashSet<String>>,
     HashMap<(String, String), Option<String>>,
     HashMap<String, ModelVisionConfig>,
 )> {
@@ -88,9 +95,16 @@ async fn load_runtime_from_db(
 
     #[derive(sqlx::FromRow)]
     struct ProviderKeyRow {
+        id: String,
         provider_id: String,
         key_ref: String,
         enabled: i64,
+    }
+
+    #[derive(sqlx::FromRow)]
+    struct KeyPoolRow {
+        api_key_id: String,
+        provider_key_id: String,
     }
 
     #[derive(sqlx::FromRow)]
@@ -118,7 +132,13 @@ async fn load_runtime_from_db(
     .await?;
 
     let key_rows: Vec<ProviderKeyRow> = sqlx::query_as(
-        "SELECT provider_id, key_ref, enabled FROM provider_keys WHERE enabled = 1",
+        "SELECT id, provider_id, key_ref, enabled FROM provider_keys WHERE enabled = 1",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let key_pool_rows: Vec<KeyPoolRow> = sqlx::query_as(
+        "SELECT api_key_id, provider_key_id FROM api_key_provider_key_pools",
     )
     .fetch_all(pool)
     .await?;
@@ -172,12 +192,21 @@ async fn load_runtime_from_db(
             continue;
         };
         keys_map.entry(k.provider_id.clone()).or_default().push(ProviderKeyInfo {
+            provider_key_id: k.id,
             api_key: k.key_ref,
             outbound_proxy: None,
             base_url,
             extra_headers: vec![],
             provider_id: k.provider_id,
         });
+    }
+
+    let mut key_pool_mapping: HashMap<String, HashSet<String>> = HashMap::new();
+    for r in key_pool_rows {
+        key_pool_mapping
+            .entry(r.api_key_id)
+            .or_default()
+            .insert(r.provider_key_id);
     }
 
     let mut model_proxy_map: HashMap<(String, String), Option<String>> = HashMap::new();
@@ -201,5 +230,5 @@ async fn load_runtime_from_db(
         );
     }
 
-    Ok((providers_map, keys_map, model_proxy_map, vision_config))
+    Ok((providers_map, keys_map, key_pool_mapping, model_proxy_map, vision_config))
 }

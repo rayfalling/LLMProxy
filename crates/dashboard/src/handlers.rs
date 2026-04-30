@@ -26,6 +26,11 @@ pub struct TenantStats {
     pub total_input_tokens: i64,
     pub total_output_tokens: i64,
     pub avg_latency_ms: f64,
+    pub qps_last_hour: f64,
+    pub p50_latency_ms_last_hour: f64,
+    pub p95_latency_ms_last_hour: f64,
+    pub error_rate_last_hour: f64,
+    pub failover_count_last_hour: i64,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -356,7 +361,7 @@ pub async fn tenant_stats(
     admin: TenantAdmin,
     State(state): State<AppState>,
 ) -> Result<Json<TenantStats>, (axum::http::StatusCode, Json<crate::auth::ApiError>)> {
-    let row: Option<TenantStats> = sqlx::query_as(
+    let row: Option<(i64, i64, i64, f64)> = sqlx::query_as(
         "SELECT
             COUNT(*) AS total_requests,
             COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
@@ -370,10 +375,60 @@ pub async fn tenant_stats(
     .await
     .map_err(crate::auth::internal_error)?;
 
-    Ok(Json(row.unwrap_or(TenantStats {
-        total_requests: 0,
-        total_input_tokens: 0,
-        total_output_tokens: 0,
-        avg_latency_ms: 0.0,
-    })))
+    let latencies: Vec<(i64,)> = sqlx::query_as(
+        "SELECT latency_ms FROM request_logs
+         WHERE tenant_id = ? AND created_at >= datetime('now', '-1 hour')
+         ORDER BY latency_ms ASC",
+    )
+    .bind(admin.tenant_id.to_string())
+    .fetch_all(&state.pool)
+    .await
+    .map_err(crate::auth::internal_error)?;
+
+    let counts: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT
+            COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END), 0) AS errors,
+            COALESCE(SUM(failover_count), 0) AS failovers
+         FROM request_logs
+         WHERE tenant_id = ? AND created_at >= datetime('now', '-1 hour')",
+    )
+    .bind(admin.tenant_id.to_string())
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(crate::auth::internal_error)?;
+
+    let p50 = percentile_from_sorted(&latencies, 0.50);
+    let p95 = percentile_from_sorted(&latencies, 0.95);
+    let (last_hour_total, last_hour_errors, last_hour_failovers) = counts.unwrap_or((0, 0, 0));
+    let qps_last_hour = (last_hour_total as f64) / 3600.0;
+    let error_rate_last_hour = if last_hour_total > 0 {
+        (last_hour_errors as f64) / (last_hour_total as f64)
+    } else {
+        0.0
+    };
+
+    let (total_requests, total_input_tokens, total_output_tokens, avg_latency_ms) =
+        row.unwrap_or((0, 0, 0, 0.0));
+
+    Ok(Json(TenantStats {
+        total_requests,
+        total_input_tokens,
+        total_output_tokens,
+        avg_latency_ms,
+        qps_last_hour,
+        p50_latency_ms_last_hour: p50,
+        p95_latency_ms_last_hour: p95,
+        error_rate_last_hour,
+        failover_count_last_hour: last_hour_failovers,
+    }))
+}
+
+fn percentile_from_sorted(values: &[(i64,)], p: f64) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let n = values.len();
+    let rank = ((n as f64 - 1.0) * p).round() as usize;
+    values[rank.min(n - 1)].0 as f64
 }
