@@ -1,0 +1,65 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/llm-core",
+    "crates/proxy",
+    "crates/dashboard",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Rayfalling <me@rayfalling.com>"]
+license = "MIT"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Web framework
+axum = { version = "0.8", features = ["multipart", "ws"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-br"] }
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "multipart", "rustls-tls", "socks"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "tls-rustls", "migrate", "macros", "chrono", "uuid"] }
+
+# Auth / crypto
+jsonwebtoken = "9"
+argon2 = "0.5"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Config
+config = "0.14"
+toml = "0.8"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Misc
+base64 = "0.22"
+bytes = "1"
+futures = "0.3"
+async-trait = "0.1"
+url = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
