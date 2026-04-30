@@ -1,6 +1,6 @@
-mod auth;
-mod handlers;
-mod state;
+use dashboard::auth;
+use dashboard::handlers;
+use dashboard::state;
 
 use axum::{routing::{get, post, put}, Router};
 use llm_core::{config::AuthConfig, db::connect_and_migrate};

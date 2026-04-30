@@ -175,10 +175,28 @@ impl FailoverEngine {
 mod tests {
     use super::*;
     use crate::routing::registry::{AliasTarget, ModelAlias, RouteStrategy};
+    use async_trait::async_trait;
+    use llm_core::{
+        provider::{DynProvider, ExecContext, ProviderAdapter, StreamResult},
+        schema::{
+            CanonicalMessage, CanonicalRequest, CanonicalResponse, ContentPart, OriginProtocol,
+            Role, StopReason, TokenUsage,
+        },
+    };
+    use chrono::Utc;
+    use std::sync::{Arc, Mutex};
+    use uuid::Uuid;
+
+    // ── unit test ────────────────────────────────────────────────────────────
 
     #[test]
     fn failover_trigger_mapping_matches_rule() {
-        let engine = FailoverEngine::new(HashMap::new(), HashMap::new(), HashMap::new(), HashMap::new());
+        let engine = FailoverEngine::new(
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+        );
         let alias = ModelAlias {
             alias_name: "gpt-4o".to_string(),
             route_strategy: RouteStrategy::Priority,
@@ -199,5 +217,248 @@ mod tests {
         };
 
         assert!(engine.should_failover(&err, &alias));
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    fn make_req() -> CanonicalRequest {
+        CanonicalRequest {
+            request_id: Uuid::new_v4(),
+            created_at: Utc::now(),
+            model: "gpt-4o".to_string(),
+            system: None,
+            messages: vec![CanonicalMessage {
+                role: Role::User,
+                content: vec![ContentPart::Text { text: "hello".to_string() }],
+                tool_call_id: None,
+                name: None,
+            }],
+            max_tokens: Some(100),
+            temperature: None,
+            top_p: None,
+            stop: vec![],
+            stream: false,
+            tools: vec![],
+            extra: serde_json::Value::Null,
+            origin_protocol: OriginProtocol::OpenAiChat,
+            has_image: false,
+            tenant_id: Uuid::nil(),
+            api_key_id: Uuid::nil(),
+        }
+    }
+
+    fn make_ok_resp() -> CanonicalResponse {
+        CanonicalResponse {
+            request_id: Uuid::nil(),
+            provider_id: "mock".to_string(),
+            model: "gpt-4o".to_string(),
+            content: vec![ContentPart::Text { text: "Hi!".to_string() }],
+            tool_calls: None,
+            stop_reason: StopReason::EndTurn,
+            usage: TokenUsage::default(),
+            latency_ms: 1,
+        }
+    }
+
+    fn make_key(provider_id: &str) -> ProviderKeyInfo {
+        ProviderKeyInfo {
+            provider_key_id: format!("{provider_id}-key"),
+            api_key: "test-key".to_string(),
+            outbound_proxy: None,
+            base_url: "https://api.example.com".to_string(),
+            extra_headers: vec![],
+            provider_id: provider_id.to_string(),
+        }
+    }
+
+    fn make_alias(targets: &[(&str, &str, i32)]) -> ModelAlias {
+        ModelAlias {
+            alias_name: "gpt-4o".to_string(),
+            route_strategy: RouteStrategy::Priority,
+            targets: targets
+                .iter()
+                .map(|(pid, pm, priority)| AliasTarget {
+                    provider_id: pid.to_string(),
+                    provider_model: pm.to_string(),
+                    priority: *priority,
+                    enabled: true,
+                })
+                .collect(),
+            failover_triggers: vec![], // empty = all triggers cause failover
+        }
+    }
+
+    // ── mock providers ───────────────────────────────────────────────────────
+
+    struct OkProvider(String);
+
+    #[async_trait]
+    impl ProviderAdapter for OkProvider {
+        fn id(&self) -> &str { &self.0 }
+        async fn complete(&self, _r: &CanonicalRequest, _c: &ExecContext) -> Result<CanonicalResponse, ProxyError> {
+            Ok(make_ok_resp())
+        }
+        async fn complete_stream(&self, _r: &CanonicalRequest, _c: &ExecContext) -> Result<StreamResult, ProxyError> {
+            unimplemented!()
+        }
+    }
+
+    struct RateLimitedProvider(String);
+
+    #[async_trait]
+    impl ProviderAdapter for RateLimitedProvider {
+        fn id(&self) -> &str { &self.0 }
+        async fn complete(&self, _r: &CanonicalRequest, _c: &ExecContext) -> Result<CanonicalResponse, ProxyError> {
+            Err(ProxyError::UpstreamError {
+                provider: self.0.clone(),
+                status: 429,
+                body: "Too Many Requests".to_string(),
+                trigger: Some(FailoverTrigger::RateLimited),
+            })
+        }
+        async fn complete_stream(&self, _r: &CanonicalRequest, _c: &ExecContext) -> Result<StreamResult, ProxyError> {
+            unimplemented!()
+        }
+    }
+
+    struct CapturingProvider {
+        id: String,
+        captured: Arc<Mutex<Option<ExecContext>>>,
+    }
+
+    #[async_trait]
+    impl ProviderAdapter for CapturingProvider {
+        fn id(&self) -> &str { &self.id }
+        async fn complete(&self, _r: &CanonicalRequest, ctx: &ExecContext) -> Result<CanonicalResponse, ProxyError> {
+            *self.captured.lock().unwrap() = Some(ctx.clone());
+            Ok(make_ok_resp())
+        }
+        async fn complete_stream(&self, _r: &CanonicalRequest, _c: &ExecContext) -> Result<StreamResult, ProxyError> {
+            unimplemented!()
+        }
+    }
+
+    // ── e2e failover tests (6.4) ─────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_failover_skips_rate_limited_to_second_provider() {
+        let mut providers = HashMap::new();
+        providers.insert("p1".to_string(), Arc::new(RateLimitedProvider("p1".to_string())) as DynProvider);
+        providers.insert("p2".to_string(), Arc::new(OkProvider("p2".to_string())) as DynProvider);
+
+        let mut keys = HashMap::new();
+        keys.insert("p1".to_string(), vec![make_key("p1")]);
+        keys.insert("p2".to_string(), vec![make_key("p2")]);
+
+        let engine = FailoverEngine::new(providers, keys, HashMap::new(), HashMap::new());
+        let alias = make_alias(&[("p1", "gpt-4o", 0), ("p2", "gpt-4o", 1)]);
+
+        let result = engine.execute(&alias, &make_req()).await;
+        assert!(result.is_ok(), "should failover from p1 (429) to p2: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_all_providers_exhausted_returns_last_error() {
+        let mut providers = HashMap::new();
+        providers.insert("p1".to_string(), Arc::new(RateLimitedProvider("p1".to_string())) as DynProvider);
+        providers.insert("p2".to_string(), Arc::new(RateLimitedProvider("p2".to_string())) as DynProvider);
+
+        let mut keys = HashMap::new();
+        keys.insert("p1".to_string(), vec![make_key("p1")]);
+        keys.insert("p2".to_string(), vec![make_key("p2")]);
+
+        let engine = FailoverEngine::new(providers, keys, HashMap::new(), HashMap::new());
+        let alias = make_alias(&[("p1", "gpt-4o", 0), ("p2", "gpt-4o", 1)]);
+
+        let result = engine.execute(&alias, &make_req()).await;
+        assert!(
+            matches!(result, Err(ProxyError::UpstreamError { status: 429, .. })),
+            "expected UpstreamError 429, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_manually_disabled_provider_is_skipped() {
+        let mut providers = HashMap::new();
+        providers.insert("p1".to_string(), Arc::new(OkProvider("p1".to_string())) as DynProvider);
+        providers.insert("p2".to_string(), Arc::new(OkProvider("p2".to_string())) as DynProvider);
+
+        let mut keys = HashMap::new();
+        keys.insert("p1".to_string(), vec![make_key("p1")]);
+        keys.insert("p2".to_string(), vec![make_key("p2")]);
+
+        let engine = FailoverEngine::new(providers, keys, HashMap::new(), HashMap::new());
+        engine.disable_provider("p1");
+
+        let alias = make_alias(&[("p1", "gpt-4o", 0), ("p2", "gpt-4o", 1)]);
+        let result = engine.execute(&alias, &make_req()).await;
+        assert!(result.is_ok(), "should skip disabled p1 and succeed via p2");
+    }
+
+    // ── proxy routing tests (6.5) ────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_model_outbound_proxy_overrides_key_proxy() {
+        let captured = Arc::new(Mutex::new(None::<ExecContext>));
+        let p1: DynProvider = Arc::new(CapturingProvider {
+            id: "p1".to_string(),
+            captured: captured.clone(),
+        });
+
+        let mut providers = HashMap::new();
+        providers.insert("p1".to_string(), p1);
+
+        let mut key = make_key("p1");
+        key.outbound_proxy = Some("socks5://127.0.0.1:1080".to_string());
+        let mut keys = HashMap::new();
+        keys.insert("p1".to_string(), vec![key]);
+
+        // model-level proxy overrides the key-level proxy
+        let mut model_proxy = HashMap::new();
+        model_proxy.insert(
+            ("p1".to_string(), "gpt-4o".to_string()),
+            Some("socks5://10.0.0.1:1081".to_string()),
+        );
+
+        let engine = FailoverEngine::new(providers, keys, HashMap::new(), model_proxy);
+        let alias = make_alias(&[("p1", "gpt-4o", 0)]);
+        let _ = engine.execute(&alias, &make_req()).await;
+
+        let ctx = captured.lock().unwrap();
+        assert_eq!(
+            ctx.as_ref().unwrap().outbound_proxy.as_deref(),
+            Some("socks5://10.0.0.1:1081"),
+            "model-level outbound proxy should override key-level proxy"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_key_proxy_used_when_no_model_override() {
+        let captured = Arc::new(Mutex::new(None::<ExecContext>));
+        let p1: DynProvider = Arc::new(CapturingProvider {
+            id: "p1".to_string(),
+            captured: captured.clone(),
+        });
+
+        let mut providers = HashMap::new();
+        providers.insert("p1".to_string(), p1);
+
+        let mut key = make_key("p1");
+        key.outbound_proxy = Some("socks5://127.0.0.1:1080".to_string());
+        let mut keys = HashMap::new();
+        keys.insert("p1".to_string(), vec![key]);
+
+        // no model-level proxy override
+        let engine = FailoverEngine::new(providers, keys, HashMap::new(), HashMap::new());
+        let alias = make_alias(&[("p1", "gpt-4o", 0)]);
+        let _ = engine.execute(&alias, &make_req()).await;
+
+        let ctx = captured.lock().unwrap();
+        assert_eq!(
+            ctx.as_ref().unwrap().outbound_proxy.as_deref(),
+            Some("socks5://127.0.0.1:1080"),
+            "key-level proxy should be used when no model override"
+        );
     }
 }
