@@ -11,7 +11,6 @@ const PASSWORD = 'correct horse battery staple'
 
 async function loginAs(page: Page) {
   await page.goto('/')
-  await page.getByLabel(/tenant/i).fill(TENANT)
   await page.getByLabel(/username/i).fill(USERNAME)
   await page.getByLabel(/password/i).fill(PASSWORD)
   await page.getByRole('button', { name: /log\s*in|sign\s*in|login/i }).click()
@@ -61,9 +60,9 @@ test.describe('first-boot setup → login → CRUD pages', () => {
     await loginAs(page)
     await page.goto('/providers')
     await expect(page.getByRole('heading', { name: /providers/i })).toBeVisible()
-    // empty-DB invariant: the providers <tbody> exists but has 0 data rows
-    const rows = page.locator('tbody tr')
-    await expect(rows).toHaveCount(0)
+    // empty-state copy now visible since there are no providers yet
+    await expect(page.getByText(/no providers yet/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /add provider/i })).toBeVisible()
   })
 
   test('6.4 /aliases loads (empty-state expected on a fresh DB)', async ({ page }) => {
@@ -71,5 +70,14 @@ test.describe('first-boot setup → login → CRUD pages', () => {
     await page.goto('/aliases')
     await expect(page.getByRole('heading', { name: /alias/i })).toBeVisible()
     await expect(page.getByText(/no aliases configured/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /add alias/i })).toBeVisible()
+  })
+
+  test('6.6 /api-keys loads with empty state and Issue button', async ({ page }) => {
+    await loginAs(page)
+    await page.goto('/api-keys')
+    await expect(page.getByRole('heading', { name: /api keys/i })).toBeVisible()
+    await expect(page.getByText(/no api keys yet/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: /issue new key/i })).toBeVisible()
   })
 })

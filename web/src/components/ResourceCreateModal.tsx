@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { initialValuesFromFields } from '../api/webui-helpers'
 
 export interface ModalField {
   name: string
@@ -28,11 +29,7 @@ export const ResourceCreateModal: React.FC<Props> = ({
   onCancel,
   onSubmit,
 }) => {
-  const initial: Record<string, string> = {}
-  for (const f of fields) {
-    initial[f.name] =
-      f.defaultValue !== undefined ? String(f.defaultValue) : ''
-  }
+  const initial = initialValuesFromFields(fields)
   const [values, setValues] = useState<Record<string, string>>(initial)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)

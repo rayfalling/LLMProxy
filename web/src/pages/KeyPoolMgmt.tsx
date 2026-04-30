@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '../components/AppLayout'
 import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
 import { apiClient } from '../api/client'
+import { groupKeyPoolMappings } from '../api/webui-helpers'
 import {
   ApiKeyView,
   KeyPoolMappingView,
@@ -54,27 +55,10 @@ export const KeyPoolMgmt: React.FC = () => {
     load()
   }, [])
 
-  const grouped = useMemo(() => {
-    type Row = { apiKeyId: string; providerId: string; providerKeyIds: string[] }
-    const lookup = new Map<string, string>()
-    Object.entries(providerKeys).forEach(([provId, list]) => {
-      list.forEach((k) => lookup.set(k.id, provId))
-    })
-    const rows = new Map<string, Row>()
-    mappings.forEach((m) => {
-      const provId = lookup.get(m.provider_key_id)
-      if (!provId) return
-      const k = `${m.api_key_id}__${provId}`
-      const r = rows.get(k) ?? {
-        apiKeyId: m.api_key_id,
-        providerId: provId,
-        providerKeyIds: [],
-      }
-      r.providerKeyIds.push(m.provider_key_id)
-      rows.set(k, r)
-    })
-    return Array.from(rows.values())
-  }, [mappings, providerKeys])
+  const grouped = useMemo(
+    () => groupKeyPoolMappings(mappings, providerKeys),
+    [mappings, providerKeys],
+  )
 
   const apiKeyLabel = (id: string): string => {
     const k = apiKeys.find((x) => x.id === id)
