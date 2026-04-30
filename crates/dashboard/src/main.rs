@@ -4,7 +4,7 @@ use dashboard::handlers;
 use dashboard::state;
 use dashboard::static_assets;
 
-use axum::{routing::{get, post, put}, Router};
+use axum::{routing::{delete, get, post, put}, Router};
 use llm_core::{config::AuthConfig, db::connect_and_migrate};
 use std::{env, net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
@@ -48,14 +48,31 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/setup/status", get(bootstrap::setup_status))
         .route("/api/auth/login", post(auth::login))
         .route("/api/me", get(handlers::me))
-        .route("/api/providers", get(handlers::list_providers))
+        .route("/api/providers", get(handlers::list_providers).post(handlers::create_provider))
+        .route("/api/providers/{provider_id}", delete(handlers::delete_provider))
         .route("/api/providers/{provider_id}/enabled", put(handlers::set_provider_enabled))
-        .route("/api/providers/{provider_id}/models", get(handlers::list_provider_models))
+        .route(
+            "/api/providers/{provider_id}/keys",
+            get(handlers::list_provider_keys).post(handlers::create_provider_key),
+        )
+        .route(
+            "/api/providers/{provider_id}/keys/{key_id}",
+            delete(handlers::delete_provider_key),
+        )
+        .route(
+            "/api/providers/{provider_id}/models",
+            get(handlers::list_provider_models).post(handlers::create_provider_model),
+        )
+        .route(
+            "/api/providers/{provider_id}/models/{model_name}",
+            delete(handlers::delete_provider_model),
+        )
         .route(
             "/api/providers/{provider_id}/models/{model_name}/enabled",
             put(handlers::set_provider_model_enabled),
         )
-        .route("/api/aliases", get(handlers::list_aliases))
+        .route("/api/aliases", get(handlers::list_aliases).post(handlers::create_alias))
+        .route("/api/aliases/{alias_name}", delete(handlers::delete_alias))
         .route(
             "/api/aliases/{alias_name}/strategy",
             put(handlers::update_alias_route_strategy),
@@ -64,15 +81,30 @@ async fn main() -> anyhow::Result<()> {
             "/api/aliases/{alias_name}/targets",
             put(handlers::update_alias_targets),
         )
-        .route("/api/key-pools", get(handlers::list_key_pool_mappings))
+        .route(
+            "/api/api-keys",
+            get(handlers::list_api_keys).post(handlers::create_api_key),
+        )
+        .route("/api/api-keys/{api_key_id}", delete(handlers::delete_api_key))
+        .route(
+            "/api/key-pools",
+            get(handlers::list_key_pool_mappings).post(handlers::create_key_pool),
+        )
         .route(
             "/api/key-pools/{api_key_id}",
             put(handlers::update_key_pool_mapping),
         )
-        .route("/api/vision-mappings", get(handlers::list_vision_mappings))
+        .route(
+            "/api/key-pools/{api_key_id}/{provider_id}",
+            delete(handlers::delete_key_pool),
+        )
+        .route(
+            "/api/vision-mappings",
+            get(handlers::list_vision_mappings).post(handlers::create_vision_mapping),
+        )
         .route(
             "/api/vision-mappings/{model_name}",
-            put(handlers::update_vision_mapping),
+            put(handlers::update_vision_mapping).delete(handlers::delete_vision_mapping),
         )
         .route("/api/events/failovers", get(handlers::list_failover_events))
         .route("/api/stats", get(handlers::tenant_stats))

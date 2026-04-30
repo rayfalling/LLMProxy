@@ -23,7 +23,6 @@ pub struct JwtClaims {
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
-    pub tenant_name: String,
     pub username: String,
     pub password: String,
 }
@@ -64,9 +63,8 @@ pub async fn login(
     let row: Option<TenantAdminRow> = sqlx::query_as(
         "SELECT ta.id AS admin_id, ta.tenant_id, ta.username, ta.password_hash \
          FROM tenant_admins ta JOIN tenants t ON t.id = ta.tenant_id \
-         WHERE t.name = ? AND ta.username = ? AND ta.status = 'active' AND t.status = 'active'",
+         WHERE ta.username = ? AND ta.status = 'active' AND t.status = 'active'",
     )
-    .bind(&req.tenant_name)
     .bind(&req.username)
     .fetch_optional(&state.pool)
     .await

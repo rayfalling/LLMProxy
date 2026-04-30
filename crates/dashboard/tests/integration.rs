@@ -107,8 +107,7 @@ async fn do_login(app: &Router, username: &str, password: &str) -> (StatusCode, 
         .uri("/api/auth/login")
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(
-            json!({"tenant_name": "test-tenant", "username": username, "password": password})
-                .to_string(),
+            json!({"username": username, "password": password}).to_string(),
         ))
         .unwrap();
     let resp = app.clone().oneshot(req).await.unwrap();

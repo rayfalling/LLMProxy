@@ -18,7 +18,6 @@ export interface SetupResponse {
 }
 
 export interface LoginRequest {
-  tenant_name: string
   username: string
   password: string
 }

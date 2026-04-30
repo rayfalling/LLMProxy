@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/client'
 
 export const Login: React.FC = () => {
-  const [tenantName, setTenantName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -17,7 +16,6 @@ export const Login: React.FC = () => {
 
     try {
       const response = await apiClient.login({
-        tenant_name: tenantName,
         username,
         password,
       })
@@ -44,21 +42,6 @@ export const Login: React.FC = () => {
               {error}
             </div>
           )}
-
-          <div>
-            <label htmlFor="login-tenant" className="block text-sm font-medium text-gray-700 mb-1">
-              Tenant Name
-            </label>
-            <input
-              id="login-tenant"
-              type="text"
-              value={tenantName}
-              onChange={(e) => setTenantName(e.target.value)}
-              placeholder="your-org"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              required
-            />
-          </div>
 
           <div>
             <label htmlFor="login-username" className="block text-sm font-medium text-gray-700 mb-1">
