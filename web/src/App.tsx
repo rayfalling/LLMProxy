@@ -13,6 +13,7 @@ import { Dashboard } from './pages/Dashboard'
 import { ProviderMgmt } from './pages/ProviderMgmt'
 import { AliasMgmt } from './pages/AliasMgmt'
 import { KeyPoolMgmt } from './pages/KeyPoolMgmt'
+import { ApiKeyMgmt } from './pages/ApiKeyMgmt'
 import { VisionMgmt } from './pages/VisionMgmt'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { apiClient } from './api/client'
@@ -92,6 +93,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <KeyPoolMgmt />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/api-keys"
+            element={
+              <ProtectedRoute>
+                <ApiKeyMgmt />
               </ProtectedRoute>
             }
           />

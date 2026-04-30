@@ -114,3 +114,100 @@ export interface ApiError {
 export interface ActionResponse {
   ok: boolean
 }
+
+// ── create/delete request payloads (webui-resource-crud-and-tenantless-login) ──
+
+export interface CreateProviderRequest {
+  name: string
+  display_name: string
+  base_url: string
+  auth_mode?: string
+  auth_header?: string | null
+}
+
+export interface ProviderKeyView {
+  id: string
+  provider_id: string
+  label: string | null
+  enabled: number
+  priority: number
+  key_preview: string
+}
+
+export interface CreateProviderKeyRequest {
+  label?: string | null
+  plaintext_key: string
+  priority?: number
+}
+
+export interface ProviderKeyCreatedResponse {
+  id: string
+  provider_id: string
+  label: string | null
+  priority: number
+  enabled: number
+}
+
+export interface CreateProviderModelRequest {
+  model_name: string
+  supports_vision?: boolean
+  supports_streaming?: boolean
+  supports_tools?: boolean
+  context_window?: number | null
+  max_output_tokens?: number | null
+}
+
+export interface CreateAliasRequest {
+  alias_name: string
+  description?: string | null
+  route_strategy?: string
+  targets?: AliasTargetInput[]
+}
+
+export interface AliasCreatedResponse {
+  id: string
+  alias_name: string
+  description: string | null
+  route_strategy: string
+  targets_count: number
+}
+
+export interface ApiKeyView {
+  id: string
+  name: string | null
+  prefix: string
+  status: string
+  quota_rpm: number | null
+  quota_tpm: number | null
+  quota_daily_req: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateApiKeyRequest {
+  name?: string | null
+  quota_rpm?: number | null
+  quota_tpm?: number | null
+  quota_daily_req?: number | null
+}
+
+export interface ApiKeyCreatedResponse {
+  id: string
+  name: string | null
+  plaintext_key: string
+  prefix: string
+  status: string
+  created_at: string
+}
+
+export interface CreateKeyPoolRequest {
+  api_key_id: string
+  provider_id: string
+  allowed_provider_key_ids: string[]
+}
+
+export interface CreateVisionMappingRequest {
+  model_name: string
+  vision_parser_alias?: string | null
+  generation_alias?: string | null
+}

@@ -5,6 +5,7 @@ const NAV = [
   { to: '/dashboard', label: 'Overview' },
   { to: '/providers', label: 'Providers' },
   { to: '/aliases', label: 'Aliases' },
+  { to: '/api-keys', label: 'API Keys' },
   { to: '/keys', label: 'Key Pools' },
   { to: '/vision', label: 'Vision' },
 ]

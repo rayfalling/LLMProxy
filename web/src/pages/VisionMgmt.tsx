@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { AppLayout } from '../components/AppLayout'
+import { ResourceCreateModal, ModalField } from '../components/ResourceCreateModal'
+import { ConfirmDeleteDialog } from '../components/ConfirmDeleteDialog'
 import { apiClient } from '../api/client'
 import { VisionMappingView } from '../api/types'
 
@@ -9,6 +11,14 @@ export const VisionMgmt: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [edits, setEdits] = useState<Record<string, { vision: string; gen: string }>>({})
   const [savingModel, setSavingModel] = useState<string | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<VisionMappingView | null>(null)
+
+  const fields: ModalField[] = [
+    { name: 'model_name', label: 'Model name', required: true, placeholder: 'e.g. gpt-4o-vision' },
+    { name: 'vision_parser_alias', label: 'Vision parser alias (optional)' },
+    { name: 'generation_alias', label: 'Generation alias (optional)' },
+  ]
 
   const load = async () => {
     try {
@@ -53,7 +63,15 @@ export const VisionMgmt: React.FC = () => {
 
   return (
     <AppLayout>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Vision mappings</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Vision mappings</h1>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
+        >
+          + Add mapping
+        </button>
+      </div>
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
           {error}
@@ -113,9 +131,15 @@ export const VisionMgmt: React.FC = () => {
                       <button
                         disabled={!dirty || savingModel === r.model_name}
                         onClick={() => onSave(r.model_name)}
-                        className="px-3 py-1 text-sm rounded bg-indigo-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        className="px-3 py-1 text-sm rounded bg-indigo-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed mr-2"
                       >
                         {savingModel === r.model_name ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => setPendingDelete(r)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Delete
                       </button>
                     </td>
                   </tr>
@@ -127,6 +151,39 @@ export const VisionMgmt: React.FC = () => {
             <div className="px-6 py-8 text-center text-gray-500">No vision mappings.</div>
           )}
         </div>
+      )}
+      {showCreate && (
+        <ResourceCreateModal
+          title="Add vision mapping"
+          fields={fields}
+          onCancel={() => setShowCreate(false)}
+          onSubmit={async (v) => {
+            await apiClient.createVisionMapping({
+              model_name: v.model_name,
+              vision_parser_alias: v.vision_parser_alias || null,
+              generation_alias: v.generation_alias || null,
+            })
+            setShowCreate(false)
+            await load()
+          }}
+        />
+      )}
+      {pendingDelete && (
+        <ConfirmDeleteDialog
+          title="Delete vision mapping"
+          message={
+            <span>
+              Remove vision mapping for <code>{pendingDelete.model_name}</code>?
+            </span>
+          }
+          confirmText="Delete"
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={async () => {
+            await apiClient.deleteVisionMapping(pendingDelete.model_name)
+            setPendingDelete(null)
+            await load()
+          }}
+        />
       )}
     </AppLayout>
   )
