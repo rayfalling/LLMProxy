@@ -1,5 +1,55 @@
 # Operational Runbook
 
+## 0. Database Wiped / Fresh Host (First-Boot Setup)
+
+### Symptoms
+- `sqlite3 llmproxy.db "SELECT count(*) FROM tenants;"` returns `0`.
+- `GET /api/setup/status` returns `{"initialized": false}`.
+- Every authenticated `/api/*` call returns 401.
+- The WebUI auto-redirects every visitor to `/setup`.
+
+### Resolution
+
+1. **Verify both services are up** but the DB really is empty:
+   ```bash
+   curl -s http://<host>:8081/healthz                         # → "ok"
+   curl -s http://<host>:8081/api/setup/status                # → {"initialized":false}
+   ```
+2. **Open the WebUI** at `http://<host>:8081/` from a trusted operator
+   workstation. The SetupGuard will redirect to `/setup` automatically.
+3. **Fill the wizard** — tenant name, admin username, password (≥ 8 chars).
+   Submit. The dashboard creates the tenant and Argon2id-hashed admin in
+   one transaction.
+4. **(Optional) Apply demo seed** for an immediate `curl` smoke-test:
+   ```bash
+   TENANT_ID=$(sqlite3 /var/lib/llmproxy/llmproxy.db \
+                 "SELECT id FROM tenants LIMIT 1;")
+   sqlite3 /var/lib/llmproxy/llmproxy.db \
+     ".param set :tenant_id '$TENANT_ID'" \
+     ".read /opt/llmproxy/scripts/seed.sql"
+   ```
+5. **Re-create your providers / aliases / key-pools** in the WebUI
+   (Providers → Aliases → Key Pools → Vision tabs), or by replaying a
+   backup of the SQLite file if you keep one.
+
+### "Setup endpoint inaccessible"
+
+If `POST /api/setup` returns 409 `already_initialized` but you still
+can't log in, the DB is not actually empty — check
+`SELECT username FROM tenant_admins;` and either reset that row's
+password by **deleting the entire SQLite file and starting over** (no
+in-place reset path is exposed by design — protects against credential
+reset bypass) or restore from a known-good backup.
+
+### Prevention
+
+- Snapshot `llmproxy.db` (and its WAL/SHM siblings) on a schedule:
+  `sqlite3 llmproxy.db ".backup '/var/backups/llmproxy.db'"`.
+- Never delete the DB file as a "restart" technique — it triggers the
+  setup wizard on the next visit.
+
+---
+
 ## 1. Failover Incident Response
 
 ### Symptoms

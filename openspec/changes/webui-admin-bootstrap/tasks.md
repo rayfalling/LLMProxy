@@ -52,15 +52,15 @@
 
 ## 7. Documentation & Deployment
 
-- [ ] 7.1 Update root `README.md`: dev workflow (Rust + npm), production build (`npm run build` then `cargo build`), first-boot setup screenshots/steps.
-- [ ] 7.2 Update `RUNBOOK.md`: incident steps for "DB wiped" and "setup endpoint inaccessible".
-- [ ] 7.3 Add `scripts/seed.sql` for optional demo data (tenant, provider, models, alias).
-- [ ] 7.4 Update systemd unit notes in `deploy/` to call out `/setup` first-visit step.
-- [ ] 7.5 Verify on `192.168.50.64`: deploy fresh build, complete setup via browser, run a sample chat completion through proxy with the new tenant's API key.
+- [x] 7.1 Update root `README.md`: dev workflow (Rust + npm), production build (`npm run build` then `cargo build`), first-boot setup screenshots/steps.
+- [x] 7.2 Update `RUNBOOK.md`: incident steps for "DB wiped" and "setup endpoint inaccessible".
+- [x] 7.3 Add `scripts/seed.sql` for optional demo data (provider, models, alias, demo api_key + key-pool binding) plus `scripts/hash-key.{ps1,sh}` helpers. Tenant/admin creation deliberately delegated to the WebUI `/setup` wizard.
+- [x] 7.4 No `deploy/` directory in this repo; systemd guidance lives inline in `RUNBOOK.md` §0 ("Database Wiped / Fresh Host") and `README.md` §First-Boot Setup, both calling out the `/setup` first-visit step.
+- [ ] 7.5 Bare-metal validation on `192.168.50.64` — DEFERRED to operator. Steps: deploy fresh build, browse to `:8081/setup`, complete wizard, optionally apply `scripts/seed.sql`, run a chat completion through the proxy with the demo API key.
 
 ## 8. Release
 
 - [x] 8.1 All Rust unit/integration tests green (`cargo test --workspace`).
 - [x] 8.2 All Vitest + Playwright tests green.
-- [ ] 8.3 Single `cargo build --release -p dashboard` produces a binary that serves the SPA correctly when run alone.
+- [x] 8.3 Single `cargo build --release -p dashboard` produces a binary that serves the SPA correctly when run alone. Verified: fresh DB, `/` + `/setup` deep-link both return embedded `index.html` (484 B), `/assets/index-*.js` returns 228 KB with `text/javascript`, `GET /api/setup/status` returns `{initialized:false}`.
 - [ ] 8.4 Update OpenSpec change status; archive after operator validation on bare metal.

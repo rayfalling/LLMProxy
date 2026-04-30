@@ -1,7 +1,9 @@
 # LLMProxy
 
-OpenRouter-style LLM reverse proxy with an admin dashboard.  
+OpenRouter-style LLM reverse proxy with an admin dashboard **and an embedded WebUI**.  
 Supports Claude and OpenAI wire protocols, 7 provider adapters, multimodal image routing, per-tenant API-key isolation, fixed-priority failover, per-model outbound proxy, upstream key-pool quota/rate-limiting, and a JWT-protected control-plane REST API.
+
+The dashboard binary embeds a React/Vite SPA, so a single `cargo build --release -p dashboard` produces a self-contained admin UI on port 8081 — no separate web server needed.
 
 ## Architecture
 
@@ -62,9 +64,50 @@ JWT_SECRET=your-secret docker compose up -d
 ### Build from source
 
 ```bash
+# Production build (embeds the WebUI into the dashboard binary):
+cd web && npm install && npm run build && cd ..
 cargo build --release
 # binaries at target/release/proxy  and  target/release/dashboard
+
+# Dev workflow (hot-reload UI on :5173 proxying to dashboard on :8081):
+cargo run -p dashboard            # backend on 8081
+cd web && npm install && npm run dev   # vite dev server on 5173
+# Vite proxies /api → :8081 (see web/vite.config.ts).
 ```
+
+> **Heads-up:** `crates/dashboard/build.rs` automatically creates a
+> `web/dist/index.html` placeholder before each `cargo build`, so cargo
+> never fails on a fresh clone where the SPA hasn't been bundled yet.
+> The placeholder simply tells the user to run `npm run build`. Run
+> `npm run build` for any deploy that needs a real UI.
+
+---
+
+## First-Boot Setup
+
+When the dashboard starts against an empty database it has no admin
+credentials. Visit **`http://<host>:8081/`** in a browser — `SetupGuard`
+detects the empty DB and redirects to **`/setup`**, where the wizard
+asks for:
+
+1. Tenant name (e.g. `acme`)
+2. Admin username
+3. Password (≥ 8 chars) + confirmation
+
+On submit the dashboard hashes the password with **Argon2id** inside a
+single SQL transaction that creates both the `tenants` row and the
+`tenant_admins` row. Subsequent visits to `/setup` are blocked with HTTP
+409 (`already_initialized`); the SPA also auto-redirects already-set-up
+browsers back to `/`.
+
+> The setup endpoint is the **only** unauthenticated mutation in the
+> control-plane API. Every other `PUT/POST` requires
+> `Authorization: Bearer <JWT>` from `POST /api/auth/login`.
+
+After setup completes you can either keep using the WebUI for everything
+or pop the demo seed (`scripts/seed.sql`) into the same SQLite file to
+get a working OpenAI alias for `curl` smoke-tests — see
+[Seeding](#seeding-demo-data) below.
 
 ---
 
@@ -114,46 +157,45 @@ SQLite is opened with:
 
 ---
 
-## Seeding Initial Data
+## Seeding Demo Data
 
-There is no web UI for initial setup — seed via SQL or a script:
+Production deployments should drive everything through the WebUI
+(`/providers`, `/aliases`, `/keys`, `/vision` pages) — but for a quick
+`curl` smoke-test, [`scripts/seed.sql`](scripts/seed.sql) inserts a
+demo OpenAI provider, two models, an alias, a downstream API key
+(`llmproxy-demo-key-replace-me`), and the required key-pool binding.
 
-```sql
--- 1. Create a tenant
-INSERT INTO tenants (id, name, status, created_at, updated_at)
-VALUES ('your-uuid', 'my-org', 'active', datetime('now'), datetime('now'));
+```bash
+# 1. Complete /setup in the WebUI to create the tenant + admin.
+# 2. Capture the tenant id:
+TENANT_ID=$(sqlite3 llmproxy.db "SELECT id FROM tenants LIMIT 1;")
 
--- 2. Hash a password with argon2id (use the argon2 CLI or a script):
---    argon2 <salt> -id -t 3 -m 12 -p 1 -l 32 -e
-INSERT INTO tenant_admins (id, tenant_id, username, password_hash, status)
-VALUES ('admin-uuid', 'your-uuid', 'admin', '$argon2id$...', 'active');
+# 3. Apply the seed (uses sqlite3 named-parameter binding):
+sqlite3 llmproxy.db \
+  ".param set :tenant_id '$TENANT_ID'" \
+  ".read scripts/seed.sql"
 
--- 3. Register an upstream provider
-INSERT INTO providers (id, name, display_name, base_url, enabled, health_state, created_at, updated_at)
-VALUES ('openai-1', 'openai', 'OpenAI', 'https://api.openai.com', 1, 'unknown', datetime('now'), datetime('now'));
+# 4. (Optional) Replace the placeholder OpenAI key:
+sqlite3 llmproxy.db \
+  "UPDATE provider_keys SET key_ref = 'sk-…real…' WHERE id = 'seed-openai-key';"
 
--- 4. Add an API key for that provider
-INSERT INTO provider_keys (id, provider_id, key_ref, enabled, priority, created_at)
-VALUES ('pk-1', 'openai-1', 'sk-...your-key...', 1, 0, datetime('now'));
-
--- 5. Register a model
-INSERT INTO provider_models (id, provider_id, model_name, enabled, supports_vision, created_at, updated_at)
-VALUES ('gpt4o-1', 'openai-1', 'gpt-4o', 1, 1, datetime('now'), datetime('now'));
-
--- 6. Create a logical alias
-INSERT INTO model_aliases (id, alias_name, route_strategy, created_at, updated_at)
-VALUES ('alias-1', 'gpt-4o', 'priority', datetime('now'), datetime('now'));
-
--- 7. Map alias to provider model
-INSERT INTO model_alias_targets (id, alias_id, provider_id, model_name, priority, enabled, created_at)
-VALUES ('t-1', 'alias-1', 'openai-1', 'gpt-4o', 0, 1, datetime('now'));
-
--- 8. Create a downstream API key for clients
-INSERT INTO api_keys (id, tenant_id, hashed_key, name, status, created_at, updated_at)
-VALUES ('ak-1', 'your-uuid', 'sha256-hash-of-client-key', 'client-key-1', 'active', datetime('now'), datetime('now'));
+# 5. Smoke-test through the proxy:
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer llmproxy-demo-key-replace-me" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-The `hashed_key` field stores **SHA-256** of the raw key (the proxy hashes the bearer token on every request).
+To compute the SHA-256 of a different downstream key:
+
+```bash
+scripts/hash-key.sh 'my-real-client-key'        # Linux/macOS
+scripts/hash-key.ps1 'my-real-client-key'       # Windows
+```
+
+> **Important:** `scripts/seed.sql` does **not** create the tenant or
+> admin. Always run the WebUI `/setup` wizard first — it's the only
+> path that produces a correctly-hashed Argon2id password.
 
 ---
 
@@ -171,9 +213,16 @@ Authenticate with `Authorization: Bearer <your-downstream-api-key>`.
 
 ### Dashboard endpoints (all require `Authorization: Bearer <JWT>`)
 
+
 ```
+POST /api/setup                                   → first-boot only (no JWT)
+GET  /api/setup/status                            → {initialized: bool}
 POST /api/auth/login                              → JWT
-GET  /api/me                                      → tenant identity
+```
+
+All endpoints below additionally require `Authorization: Bearer <JWT>`:
+
+```ant identity
 GET  /api/providers                               → list providers
 PUT  /api/providers/{id}/enabled                  → enable/disable provider
 GET  /api/providers/{id}/models                   → list models
@@ -225,10 +274,18 @@ Two modes (configured per model in `model_vision_mappings`):
 - When a provider returns a failure that matches any of the alias's `failover_triggers`, the engine retries the next target.
 - Trigger values: `insufficient_balance`, `rate_limited`, `server_error`, `timeout`, `model_offline`, `manually_disabled`.
 - Empty `failover_triggers` list = failover on all errors.
-- Providers can be manually disabled via the dashboard or `PUT /api/providers/{id}/enabled`.
+# Rust workspace (28 tests):
+cargo test --workspace
 
----
+# Frontend unit tests (Vitest, 13 tests):
+cd web && npm run test:unit
 
+# End-to-end (Playwright, 6 tests, spawns a real dashboard with a temp SQLite):
+scripts/e2e.ps1     # Windows
+scripts/e2e.sh      # Linux/macOS
+```
+
+The Rust tests use `sqlite::memory:` — no file-system state
 ## Running Tests
 
 ```bash
