@@ -1,4 +1,4 @@
-// API request / response types — kept aligned with crates/dashboard endpoints.
+// API request / response types — mirror crates/dashboard/src/handlers.rs.
 
 export interface SetupStatus {
   initialized: boolean
@@ -36,11 +36,11 @@ export interface MeResponse {
   username: string
 }
 
+// providers
 export interface ProviderView {
   id: string
   name: string
   display_name: string
-  base_url: string
   enabled: number
   health_state: string
 }
@@ -53,53 +53,65 @@ export interface ProviderModel {
   supports_vision: number
   supports_streaming: number
   supports_tools: number
+  outbound_proxy_id: string | null
 }
 
-export interface ModelAlias {
+// aliases
+export interface AliasView {
   id: string
   alias_name: string
+  description: string | null
   route_strategy: string
-  targets?: AliasTarget[]
 }
 
-export interface AliasTarget {
-  id?: string
+export interface AliasTargetInput {
   provider_id: string
   model_name: string
   priority: number
-  enabled: number
+  enabled: boolean
 }
 
-export interface KeyPoolMapping {
+// key pools (flat list of (api_key_id, provider_key_id) pairs)
+export interface KeyPoolMappingView {
   api_key_id: string
-  provider_key_ids: string[]
+  provider_key_id: string
 }
 
-export interface VisionMapping {
+// vision mappings
+export interface VisionMappingView {
   model_name: string
-  vision_parser_alias: string
-  generation_alias: string
+  vision_parser_alias: string | null
+  generation_alias: string | null
 }
 
+// stats
 export interface TenantStats {
-  qps: number
-  p50_latency_ms: number
-  p95_latency_ms: number
-  error_rate: number
-  failover_count: number
+  total_requests: number
+  total_input_tokens: number
+  total_output_tokens: number
+  avg_latency_ms: number
+  qps_last_hour: number
+  p50_latency_ms_last_hour: number
+  p95_latency_ms_last_hour: number
+  error_rate_last_hour: number
+  failover_count_last_hour: number
 }
 
-export interface FailoverEvent {
-  id: string
-  tenant_id?: string
-  alias_name: string
-  original_provider: string
-  failover_provider: string
-  reason: string
+export interface FailoverEventView {
+  request_id: string
+  model_alias: string
+  provider_id: string | null
+  provider_model: string | null
+  failover_count: number
+  error_code: string | null
   created_at: string
 }
 
 export interface ApiError {
   error: string
   message: string
+}
+
+export interface ActionResponse {
+  ok: boolean
 }

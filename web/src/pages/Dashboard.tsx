@@ -1,144 +1,104 @@
 import React, { useEffect, useState } from 'react'
-import { Header } from '../components/Header'
+import { AppLayout } from '../components/AppLayout'
 import { apiClient } from '../api/client'
-import { TenantStats, FailoverEvent } from '../api/types'
+import { TenantStats, FailoverEventView } from '../api/types'
 
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<TenantStats | null>(null)
-  const [events, setEvents] = useState<FailoverEvent[]>([])
+  const [events, setEvents] = useState<FailoverEventView[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsData, eventsData] = await Promise.all([
-          apiClient.getTenantStats(),
-          apiClient.listFailoverEvents(10),
-        ])
-        setStats(statsData)
-        setEvents(eventsData)
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err)
-      } finally {
-        setLoading(false)
-      }
+    let cancelled = false
+    Promise.all([apiClient.getTenantStats(), apiClient.listFailoverEvents(10)])
+      .then(([s, e]) => {
+        if (cancelled) return
+        setStats(s)
+        setEvents(e)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err.response?.data?.message || 'Failed to load dashboard')
+      })
+      .finally(() => !cancelled && setLoading(false))
+    return () => {
+      cancelled = true
     }
-
-    fetchData()
   }, [])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-lg text-gray-600">Loading...</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            title="QPS"
-            value={stats?.qps.toFixed(1) || '0.0'}
-            unit="req/s"
-            className="bg-blue-50"
-          />
-          <StatCard
-            title="P50 Latency"
-            value={stats?.p50_latency_ms.toFixed(0) || '0'}
-            unit="ms"
-            className="bg-green-50"
-          />
-          <StatCard
-            title="P95 Latency"
-            value={stats?.p95_latency_ms.toFixed(0) || '0'}
-            unit="ms"
-            className="bg-yellow-50"
-          />
-          <StatCard
-            title="Error Rate"
-            value={stats?.error_rate.toFixed(2) || '0.00'}
-            unit="%"
-            className="bg-red-50"
-          />
-        </div>
+    <AppLayout>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Overview</h1>
 
-        {/* Failover Events */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Failover Events</h2>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {events.length === 0 ? (
-              <div className="px-6 py-8 text-center text-gray-500">No failover events</div>
-            ) : (
-              events.map((event) => (
-                <div key={event.id} className="px-6 py-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">{event.alias_name}</p>
-                      <p className="text-sm text-gray-600">
-                        {event.original_provider} → {event.failover_provider}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">{event.reason}</p>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(event.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+      {loading && <div className="text-gray-500">Loading…</div>}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
         </div>
+      )}
 
-        {/* Navigation Links */}
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <NavLink href="/providers" icon="🔌" title="Providers" />
-          <NavLink href="/aliases" icon="🔀" title="Aliases" />
-          <NavLink href="/keys" icon="🔑" title="Key Pools" />
-          <NavLink href="/vision" icon="👁️" title="Vision Mapping" />
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard label="QPS (1h)" value={stats.qps_last_hour.toFixed(2)} unit="req/s" />
+          <StatCard label="P50 latency (1h)" value={stats.p50_latency_ms_last_hour.toFixed(0)} unit="ms" />
+          <StatCard label="P95 latency (1h)" value={stats.p95_latency_ms_last_hour.toFixed(0)} unit="ms" />
+          <StatCard label="Error rate (1h)" value={(stats.error_rate_last_hour * 100).toFixed(2)} unit="%" />
+          <StatCard label="Total requests" value={stats.total_requests.toLocaleString()} unit="" />
+          <StatCard label="Failover events (1h)" value={stats.failover_count_last_hour.toString()} unit="" />
+          <StatCard label="Avg latency" value={stats.avg_latency_ms.toFixed(0)} unit="ms" />
+          <StatCard
+            label="Total tokens"
+            value={(stats.total_input_tokens + stats.total_output_tokens).toLocaleString()}
+            unit=""
+          />
         </div>
-      </main>
-    </div>
+      )}
+
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Recent failover events</h2>
+        </div>
+        {events.length === 0 ? (
+          <div className="px-6 py-8 text-center text-gray-500">No failover events recorded.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600">
+              <tr>
+                <th className="px-6 py-2 text-left">Time</th>
+                <th className="px-6 py-2 text-left">Alias</th>
+                <th className="px-6 py-2 text-left">Provider / Model</th>
+                <th className="px-6 py-2 text-right">Failovers</th>
+                <th className="px-6 py-2 text-left">Error</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {events.map((e) => (
+                <tr key={e.request_id}>
+                  <td className="px-6 py-2 text-gray-500">{e.created_at}</td>
+                  <td className="px-6 py-2 font-medium">{e.model_alias}</td>
+                  <td className="px-6 py-2">
+                    {e.provider_id || '-'}
+                    {e.provider_model ? ` / ${e.provider_model}` : ''}
+                  </td>
+                  <td className="px-6 py-2 text-right">{e.failover_count}</td>
+                  <td className="px-6 py-2 text-red-600">{e.error_code || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </AppLayout>
   )
 }
 
-interface StatCardProps {
-  title: string
-  value: string
-  unit: string
-  className: string
-}
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, unit, className }) => (
-  <div className={`${className} rounded-lg p-6`}>
-    <p className="text-sm font-medium text-gray-600">{title}</p>
-    <p className="text-3xl font-bold text-gray-900 mt-2">
-      {value} <span className="text-base text-gray-600">{unit}</span>
+const StatCard: React.FC<{ label: string; value: string; unit: string }> = ({ label, value, unit }) => (
+  <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+    <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
+    <p className="mt-1 text-2xl font-bold text-gray-900">
+      {value}
+      {unit && <span className="ml-1 text-sm text-gray-500">{unit}</span>}
     </p>
   </div>
-)
-
-interface NavLinkProps {
-  href: string
-  icon: string
-  title: string
-}
-
-const NavLink: React.FC<NavLinkProps> = ({ href, icon, title }) => (
-  <a
-    href={href}
-    className="bg-white rounded-lg p-6 shadow hover:shadow-lg transition text-center"
-  >
-    <div className="text-3xl mb-3">{icon}</div>
-    <p className="font-semibold text-gray-900">{title}</p>
-  </a>
 )

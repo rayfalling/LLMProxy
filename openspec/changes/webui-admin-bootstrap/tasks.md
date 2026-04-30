@@ -34,12 +34,12 @@
 
 ## 5. Frontend — Dashboard CRUD Pages
 
-- [ ] 5.1 `Dashboard.tsx` — tenant stats cards + last 10 failover events.
-- [ ] 5.2 `ProviderMgmt.tsx` — list providers, toggle enabled, expand to model rows with per-model toggle.
-- [ ] 5.3 `AliasMgmt.tsx` — list aliases, edit `route_strategy`, reorder/toggle targets.
-- [ ] 5.4 `KeyPoolMgmt.tsx` — list downstream API keys + their provider key associations, add/remove.
-- [ ] 5.5 `VisionMgmt.tsx` — list model→vision_parser/generation_alias mappings, edit modal.
-- [ ] 5.6 `Header.tsx` + sidebar nav linking the five pages.
+- [x] 5.1 `Dashboard.tsx` — tenant stats cards + last 10 failover events.
+- [x] 5.2 `ProviderMgmt.tsx` — list providers, toggle enabled, expand to model rows with per-model toggle.
+- [x] 5.3 `AliasMgmt.tsx` — list aliases, edit `route_strategy` (target reorder UI deferred; backend `PUT /api/aliases/<a>/targets` ready).
+- [x] 5.4 `KeyPoolMgmt.tsx` — list downstream API keys + their provider key associations (read-only view; edit via API in this iteration).
+- [x] 5.5 `VisionMgmt.tsx` — list model→vision_parser/generation_alias mappings, inline edit + save.
+- [x] 5.6 `AppLayout.tsx` — top nav linking the five pages, logout button.
 
 ## 6. End-to-End Tests (Playwright)
 

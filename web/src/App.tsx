@@ -10,6 +10,10 @@ import {
 import { Login } from './pages/Login'
 import { Setup } from './pages/Setup'
 import { Dashboard } from './pages/Dashboard'
+import { ProviderMgmt } from './pages/ProviderMgmt'
+import { AliasMgmt } from './pages/AliasMgmt'
+import { KeyPoolMgmt } from './pages/KeyPoolMgmt'
+import { VisionMgmt } from './pages/VisionMgmt'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { apiClient } from './api/client'
 
@@ -64,6 +68,38 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/providers"
+            element={
+              <ProtectedRoute>
+                <ProviderMgmt />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/aliases"
+            element={
+              <ProtectedRoute>
+                <AliasMgmt />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/keys"
+            element={
+              <ProtectedRoute>
+                <KeyPoolMgmt />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vision"
+            element={
+              <ProtectedRoute>
+                <VisionMgmt />
               </ProtectedRoute>
             }
           />

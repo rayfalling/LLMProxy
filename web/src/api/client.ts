@@ -5,11 +5,11 @@ import {
   ProviderView,
   ProviderModel,
   TenantStats,
-  FailoverEvent,
-  ModelAlias,
-  AliasTarget,
-  KeyPoolMapping,
-  VisionMapping,
+  FailoverEventView,
+  AliasView,
+  AliasTargetInput,
+  KeyPoolMappingView,
+  VisionMappingView,
   SetupRequest,
   SetupResponse,
   SetupStatus,
@@ -22,21 +22,16 @@ class ApiClient {
   private http: AxiosInstance
 
   constructor() {
-    this.http = axios.create({
-      baseURL: API_BASE,
-      timeout: 15000,
-    })
+    this.http = axios.create({ baseURL: API_BASE, timeout: 15000 })
 
     this.http.interceptors.request.use((config) => {
       const token = localStorage.getItem('jwt_token')
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-      }
+      if (token) config.headers.Authorization = `Bearer ${token}`
       return config
     })
 
     this.http.interceptors.response.use(
-      (response) => response,
+      (r) => r,
       (error) => {
         if (error.response?.status === 401) {
           localStorage.removeItem('jwt_token')
@@ -52,109 +47,87 @@ class ApiClient {
     )
   }
 
-  // ── setup / auth ────────────────────────────────────────────────────────
+  // setup / auth
   async getSetupStatus(): Promise<SetupStatus> {
-    const r = await this.http.get<SetupStatus>('/setup/status')
-    return r.data
+    return (await this.http.get<SetupStatus>('/setup/status')).data
   }
-
   async setup(req: SetupRequest): Promise<SetupResponse> {
-    const r = await this.http.post<SetupResponse>('/setup', req)
-    return r.data
+    return (await this.http.post<SetupResponse>('/setup', req)).data
   }
-
   async login(req: LoginRequest): Promise<LoginResponse> {
-    const r = await this.http.post<LoginResponse>('/auth/login', req)
-    return r.data
+    return (await this.http.post<LoginResponse>('/auth/login', req)).data
   }
-
   async me(): Promise<MeResponse> {
-    const r = await this.http.get<MeResponse>('/me')
-    return r.data
+    return (await this.http.get<MeResponse>('/me')).data
   }
 
-  // ── providers ───────────────────────────────────────────────────────────
+  // providers
   async listProviders(): Promise<ProviderView[]> {
-    const r = await this.http.get<ProviderView[]>('/providers')
-    return r.data
+    return (await this.http.get<ProviderView[]>('/providers')).data
   }
-
-  async setProviderEnabled(providerId: string, enabled: boolean) {
+  async setProviderEnabled(providerId: string, enabled: boolean): Promise<void> {
     await this.http.put(`/providers/${providerId}/enabled`, { enabled })
   }
-
   async listProviderModels(providerId: string): Promise<ProviderModel[]> {
-    const r = await this.http.get<ProviderModel[]>(`/providers/${providerId}/models`)
-    return r.data
+    return (await this.http.get<ProviderModel[]>(`/providers/${providerId}/models`)).data
   }
-
   async setProviderModelEnabled(
     providerId: string,
     modelName: string,
     enabled: boolean,
-  ) {
+  ): Promise<void> {
     await this.http.put(
       `/providers/${providerId}/models/${encodeURIComponent(modelName)}/enabled`,
       { enabled },
     )
   }
 
-  // ── aliases ─────────────────────────────────────────────────────────────
-  async listAliases(): Promise<ModelAlias[]> {
-    const r = await this.http.get<ModelAlias[]>('/aliases')
-    return r.data
+  // aliases
+  async listAliases(): Promise<AliasView[]> {
+    return (await this.http.get<AliasView[]>('/aliases')).data
   }
-
-  async updateAliasStrategy(aliasName: string, routeStrategy: string) {
+  async updateAliasStrategy(aliasName: string, routeStrategy: string): Promise<void> {
     await this.http.put(`/aliases/${encodeURIComponent(aliasName)}/strategy`, {
       route_strategy: routeStrategy,
     })
   }
-
-  async updateAliasTargets(aliasName: string, targets: AliasTarget[]) {
-    await this.http.put(`/aliases/${encodeURIComponent(aliasName)}/targets`, {
-      targets,
-    })
+  async updateAliasTargets(aliasName: string, targets: AliasTargetInput[]): Promise<void> {
+    await this.http.put(`/aliases/${encodeURIComponent(aliasName)}/targets`, { targets })
   }
 
-  // ── key pools ───────────────────────────────────────────────────────────
-  async listKeyPoolMappings(): Promise<KeyPoolMapping[]> {
-    const r = await this.http.get<KeyPoolMapping[]>('/key-pools')
-    return r.data
+  // key pools
+  async listKeyPoolMappings(): Promise<KeyPoolMappingView[]> {
+    return (await this.http.get<KeyPoolMappingView[]>('/key-pools')).data
   }
-
-  async updateKeyPoolMapping(apiKeyId: string, providerKeyIds: string[]) {
+  async updateKeyPoolMapping(apiKeyId: string, providerKeyIds: string[]): Promise<void> {
     await this.http.put(`/key-pools/${apiKeyId}`, { provider_key_ids: providerKeyIds })
   }
 
-  // ── vision mappings ─────────────────────────────────────────────────────
-  async listVisionMappings(): Promise<VisionMapping[]> {
-    const r = await this.http.get<VisionMapping[]>('/vision-mappings')
-    return r.data
+  // vision mappings
+  async listVisionMappings(): Promise<VisionMappingView[]> {
+    return (await this.http.get<VisionMappingView[]>('/vision-mappings')).data
   }
-
   async updateVisionMapping(
     modelName: string,
-    visionParserAlias: string,
-    generationAlias: string,
-  ) {
+    visionParserAlias: string | null,
+    generationAlias: string | null,
+  ): Promise<void> {
     await this.http.put(`/vision-mappings/${encodeURIComponent(modelName)}`, {
       vision_parser_alias: visionParserAlias,
       generation_alias: generationAlias,
     })
   }
 
-  // ── stats ───────────────────────────────────────────────────────────────
+  // stats
   async getTenantStats(): Promise<TenantStats> {
-    const r = await this.http.get<TenantStats>('/stats')
-    return r.data
+    return (await this.http.get<TenantStats>('/stats')).data
   }
-
-  async listFailoverEvents(limit = 20): Promise<FailoverEvent[]> {
-    const r = await this.http.get<FailoverEvent[]>('/events/failovers', {
-      params: { limit },
-    })
-    return r.data
+  async listFailoverEvents(limit = 20): Promise<FailoverEventView[]> {
+    return (
+      await this.http.get<FailoverEventView[]>('/events/failovers', {
+        params: { limit },
+      })
+    ).data
   }
 }
 
