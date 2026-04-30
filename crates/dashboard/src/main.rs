@@ -65,6 +65,11 @@ async fn main() -> anyhow::Result<()> {
             "/api/key-pools/{api_key_id}",
             put(handlers::update_key_pool_mapping),
         )
+        .route("/api/vision-mappings", get(handlers::list_vision_mappings))
+        .route(
+            "/api/vision-mappings/{model_name}",
+            put(handlers::update_vision_mapping),
+        )
         .route("/api/events/failovers", get(handlers::list_failover_events))
         .route("/api/stats", get(handlers::tenant_stats))
         .with_state(state);

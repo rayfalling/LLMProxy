@@ -26,7 +26,7 @@
 - [x] 3.1 Add image input normalization in canonical schema.
 - [x] 3.2 Implement default same-model multimodal execution when model supports vision.
 - [x] 3.3 Implement split fallback pipeline: vision parser model + generation model.
-- [ ] 3.4 Add dashboard fields for vision/generation model mapping.
+- [x] 3.4 Add dashboard fields for vision/generation model mapping.
 - [x] 3.5 Add per-model outbound proxy configuration and runtime binding.
 
 ## 4. Dashboard and Control Plane

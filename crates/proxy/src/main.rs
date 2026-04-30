@@ -125,6 +125,13 @@ async fn load_runtime_from_db(
         password: Option<String>,
     }
 
+    #[derive(sqlx::FromRow)]
+    struct VisionMapRow {
+        model_name: String,
+        vision_parser_alias: Option<String>,
+        generation_alias: Option<String>,
+    }
+
     let provider_rows: Vec<ProviderRow> = sqlx::query_as(
         "SELECT id, name, base_url, enabled FROM providers WHERE enabled = 1",
     )
@@ -151,6 +158,12 @@ async fn load_runtime_from_db(
 
     let proxy_rows: Vec<ProxyRow> = sqlx::query_as(
         "SELECT id, scheme, host, port, username, password FROM outbound_proxies WHERE enabled = 1",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let vision_map_rows: Vec<VisionMapRow> = sqlx::query_as(
+        "SELECT model_name, vision_parser_alias, generation_alias FROM model_vision_mappings",
     )
     .fetch_all(pool)
     .await?;
@@ -228,6 +241,22 @@ async fn load_runtime_from_db(
                 vision_parser_alias: None,
             },
         );
+    }
+
+    for row in vision_map_rows {
+        if let Some(cfg) = vision_config.get_mut(&row.model_name) {
+            cfg.vision_parser_alias = row.vision_parser_alias;
+        } else {
+            vision_config.insert(
+                row.model_name,
+                ModelVisionConfig {
+                    supports_vision: false,
+                    vision_parser_alias: row.vision_parser_alias,
+                },
+            );
+        }
+
+        let _ = row.generation_alias;
     }
 
     Ok((providers_map, keys_map, key_pool_mapping, model_proxy_map, vision_config))

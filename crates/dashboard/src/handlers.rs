@@ -108,6 +108,19 @@ pub struct UpdateKeyPoolRequest {
     pub provider_key_ids: Vec<String>,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+pub struct VisionMappingView {
+    pub model_name: String,
+    pub vision_parser_alias: Option<String>,
+    pub generation_alias: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateVisionMappingRequest {
+    pub vision_parser_alias: Option<String>,
+    pub generation_alias: Option<String>,
+}
+
 pub async fn me(admin: TenantAdmin) -> Json<MeResponse> {
     Json(MeResponse {
         tenant_id: admin.tenant_id.to_string(),
@@ -355,6 +368,45 @@ pub async fn list_failover_events(
     .map_err(crate::auth::internal_error)?;
 
     Ok(Json(rows))
+}
+
+pub async fn list_vision_mappings(
+    _admin: TenantAdmin,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<VisionMappingView>>, (StatusCode, Json<crate::auth::ApiError>)> {
+    let rows: Vec<VisionMappingView> = sqlx::query_as(
+        "SELECT model_name, vision_parser_alias, generation_alias FROM model_vision_mappings ORDER BY model_name",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(crate::auth::internal_error)?;
+
+    Ok(Json(rows))
+}
+
+pub async fn update_vision_mapping(
+    _admin: TenantAdmin,
+    Path(model_name): Path<String>,
+    State(state): State<AppState>,
+    Json(req): Json<UpdateVisionMappingRequest>,
+) -> Result<Json<ActionResponse>, (StatusCode, Json<crate::auth::ApiError>)> {
+    sqlx::query(
+        "INSERT INTO model_vision_mappings (id, model_name, vision_parser_alias, generation_alias, created_at, updated_at)
+         VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+         ON CONFLICT(model_name) DO UPDATE SET
+             vision_parser_alias = excluded.vision_parser_alias,
+             generation_alias = excluded.generation_alias,
+             updated_at = datetime('now')",
+    )
+    .bind(Uuid::new_v4().to_string())
+    .bind(model_name)
+    .bind(req.vision_parser_alias)
+    .bind(req.generation_alias)
+    .execute(&state.pool)
+    .await
+    .map_err(crate::auth::internal_error)?;
+
+    Ok(Json(ActionResponse { ok: true }))
 }
 
 pub async fn tenant_stats(
