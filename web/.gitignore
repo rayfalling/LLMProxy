@@ -4,3 +4,6 @@ dist/
 .DS_Store
 *.swp
 *.swo
+test-data/
+playwright-report/
+test-results/

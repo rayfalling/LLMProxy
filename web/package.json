@@ -6,8 +6,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest",
-    "e2e": "playwright test"
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -25,6 +26,7 @@
     "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "@playwright/test": "^1.40.0",
-    "vitest": "^0.34.0"
+    "vitest": "^1.6.0",
+    "jsdom": "^24.0.0"
   }
 }

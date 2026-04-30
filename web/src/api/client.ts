@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
+import { attachAuthHeader, handleUnauthorized } from './auth'
 import {
   LoginRequest,
   LoginResponse,
@@ -24,27 +25,8 @@ class ApiClient {
   constructor() {
     this.http = axios.create({ baseURL: API_BASE, timeout: 15000 })
 
-    this.http.interceptors.request.use((config) => {
-      const token = localStorage.getItem('jwt_token')
-      if (token) config.headers.Authorization = `Bearer ${token}`
-      return config
-    })
-
-    this.http.interceptors.response.use(
-      (r) => r,
-      (error) => {
-        if (error.response?.status === 401) {
-          localStorage.removeItem('jwt_token')
-          if (
-            window.location.pathname !== '/' &&
-            window.location.pathname !== '/setup'
-          ) {
-            window.location.href = '/'
-          }
-        }
-        return Promise.reject(error)
-      },
-    )
+    this.http.interceptors.request.use(attachAuthHeader)
+    this.http.interceptors.response.use((r) => r, handleUnauthorized)
   }
 
   // setup / auth

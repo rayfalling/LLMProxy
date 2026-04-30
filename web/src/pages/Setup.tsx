@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../api/client'
+import { validateSetup, SETUP_ERROR_MESSAGES } from '../api/validate'
 
 export const Setup: React.FC = () => {
   const [tenantName, setTenantName] = useState('')
@@ -16,32 +17,21 @@ export const Setup: React.FC = () => {
     e.preventDefault()
     setError('')
 
-    // Validation
-    if (!tenantName.trim()) {
-      setError('Tenant name is required')
-      return
+    const req = {
+      tenant_name: tenantName,
+      username,
+      password,
+      password_confirm: passwordConfirm,
     }
-    if (!username.trim()) {
-      setError('Username is required')
-      return
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
-    }
-    if (password !== passwordConfirm) {
-      setError('Passwords do not match')
+    const code = validateSetup(req)
+    if (code) {
+      setError(SETUP_ERROR_MESSAGES[code])
       return
     }
 
     setLoading(true)
     try {
-      await apiClient.setup({
-        tenant_name: tenantName,
-        username,
-        password,
-        password_confirm: passwordConfirm,
-      })
+      await apiClient.setup(req)
       setSuccess(true)
       setTimeout(() => {
         navigate('/')
@@ -80,60 +70,60 @@ export const Setup: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="setup-tenant" className="block text-sm font-medium text-gray-700 mb-1">
               Tenant Name
             </label>
             <input
+              id="setup-tenant"
               type="text"
               value={tenantName}
               onChange={(e) => setTenantName(e.target.value)}
               placeholder="my-organization"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              required
             />
             <p className="text-xs text-gray-500 mt-1">Identifier for your organization</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="setup-username" className="block text-sm font-medium text-gray-700 mb-1">
               Admin Username
             </label>
             <input
+              id="setup-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="admin"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="setup-password" className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
             <input
+              id="setup-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              required
             />
             <p className="text-xs text-gray-500 mt-1">At least 8 characters</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="setup-password-confirm" className="block text-sm font-medium text-gray-700 mb-1">
               Confirm Password
             </label>
             <input
+              id="setup-password-confirm"
               type="password"
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
               placeholder="••••••••"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              required
             />
           </div>
 
