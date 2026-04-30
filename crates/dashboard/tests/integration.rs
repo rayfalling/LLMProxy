@@ -43,6 +43,7 @@ fn build_app(pool: sqlx::SqlitePool) -> Router {
         .route("/api/providers/{provider_id}/enabled", put(handlers::set_provider_enabled))
         .route("/api/aliases", get(handlers::list_aliases))
         .route("/api/aliases/{alias_name}/strategy", put(handlers::update_alias_route_strategy))
+        .route("/api/stats", get(handlers::tenant_stats))
         .with_state(state)
 }
 
@@ -271,4 +272,88 @@ async fn test_update_alias_strategy_persists() {
     let bytes = to_bytes(resp2.into_body(), 1 << 20).await.unwrap();
     let json: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(json[0]["route_strategy"], "latency");
+}
+
+#[tokio::test]
+async fn test_stats_empty_logs_returns_zeros_not_500() {
+    // Regression: GET /api/stats used to 500 on a fresh DB because
+    // `COALESCE(AVG(latency_ms), 0)` returned INTEGER, mismatching the f64
+    // decode target. Fix casts the column to REAL.
+    let app = build_app(setup_db().await);
+    let (_, login_body) = do_login(&app, ADMIN_USER, ADMIN_PASS).await;
+    let token = login_body["token"].as_str().unwrap().to_string();
+
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri("/api/stats")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "stats on empty logs must not 500");
+
+    let bytes = to_bytes(resp.into_body(), 1 << 20).await.unwrap();
+    let body: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(body["total_requests"], 0);
+    assert_eq!(body["total_input_tokens"], 0);
+    assert_eq!(body["total_output_tokens"], 0);
+    assert_eq!(body["avg_latency_ms"], 0.0);
+    assert_eq!(body["qps_last_hour"], 0.0);
+    assert_eq!(body["error_rate_last_hour"], 0.0);
+    assert_eq!(body["failover_count_last_hour"], 0);
+}
+
+#[tokio::test]
+async fn test_stats_with_seeded_logs_aggregates() {
+    let pool = setup_db().await;
+    // Seed 4 request_logs, mix of statuses + non-trivial latencies.
+    for (idx, (status, lat, fail)) in [
+        ("success", 100i64, 0i64),
+        ("success", 200, 0),
+        ("error", 300, 1),
+        ("success", 400, 0),
+    ]
+    .iter()
+    .enumerate()
+    {
+        sqlx::query(
+            "INSERT INTO request_logs (id, tenant_id, api_key_id, request_id, model_alias, \
+             origin_protocol, status, latency_ms, input_tokens, output_tokens, \
+             failover_count, created_at) \
+             VALUES (?, ?, 'key-1', ?, 'gpt-4o', 'openai', ?, ?, 10, 20, ?, datetime('now'))",
+        )
+        .bind(format!("log-{idx}"))
+        .bind(TENANT_ID)
+        .bind(format!("req-{idx}"))
+        .bind(*status)
+        .bind(*lat)
+        .bind(*fail)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    let app = build_app(pool);
+    let (_, login_body) = do_login(&app, ADMIN_USER, ADMIN_PASS).await;
+    let token = login_body["token"].as_str().unwrap().to_string();
+
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri("/api/stats")
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
+        .unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let bytes = to_bytes(resp.into_body(), 1 << 20).await.unwrap();
+    let body: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(body["total_requests"], 4);
+    assert_eq!(body["total_input_tokens"], 40);
+    assert_eq!(body["total_output_tokens"], 80);
+    assert_eq!(body["avg_latency_ms"], 250.0);
+    assert_eq!(body["failover_count_last_hour"], 1);
+    // 1 error / 4 total
+    let err_rate = body["error_rate_last_hour"].as_f64().unwrap();
+    assert!((err_rate - 0.25).abs() < 1e-9, "error_rate={err_rate}");
 }

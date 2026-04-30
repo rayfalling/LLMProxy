@@ -418,7 +418,7 @@ pub async fn tenant_stats(
             COUNT(*) AS total_requests,
             COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
             COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
-            COALESCE(AVG(latency_ms), 0) AS avg_latency_ms
+            CAST(COALESCE(AVG(latency_ms), 0.0) AS REAL) AS avg_latency_ms
          FROM request_logs
          WHERE tenant_id = ?",
     )
